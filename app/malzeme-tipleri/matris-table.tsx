@@ -14,7 +14,7 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
     try {
         setDocLoading(true);
 
-        // EXCEL DOSYAMIZ BOZULMASIN DİYE YENİ JSON VERİSİNİ DÜZLEŞTİRİYORUZ
+        // Orijinal Excel şablon kodunun bozulmaması için JSON veriyi düzleştirip gönderiyoruz
         const flattenedMaterials: any[] = [];
         filteredMaterials.forEach(item => {
           let certs: any[] = [];
@@ -156,7 +156,18 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
               })}
             </tbody>
           </table>
+          {filteredMaterials.length === 0 && (
+            <p className="text-sm text-neutral-400 py-6 text-center">
+              Henüz teknik onay matrisine veri eklenmemiş veya seçilen filtreye uygun veri yok.
+            </p>
+          )}
         </div>
+      </div>
+
+      <div className="hidden print:grid grid-cols-3 gap-6 pt-16 text-center text-xs font-semibold">
+        <div><p className="text-neutral-500">HAZIRLAYAN (YÜKLENİCİ)</p><p className="mt-8 text-neutral-900">Ekinoks Mekanik A.Ş.</p></div>
+        <div><p className="text-neutral-500">İNCELEYEN (MÜŞAVİR)</p><p className="mt-8 text-neutral-400">□ ONAYLANDI</p></div>
+        <div><p className="text-neutral-500">ONAYLAYAN (İŞVEREN)</p><p className="mt-8 text-neutral-300">______</p></div>
       </div>
     </div>
   );

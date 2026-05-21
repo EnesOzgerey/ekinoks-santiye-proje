@@ -1,13 +1,15 @@
+-- 1. Malzeme Cinsleri (Kategori)
 CREATE TABLE IF NOT EXISTS malzeme_cinsleri (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL
 );
 
+-- 2. Malzeme Tipleri (Üretici ve Sertifikalar JSON olarak)
 CREATE TABLE IF NOT EXISTS malzeme_tipleri (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cins_id INTEGER,
     company_name TEXT NOT NULL,
-    certificates TEXT,
+    certificates TEXT, -- Standart, belge_no ve tarihleri dizi (array) olarak tutacak JSON alanı
     FOREIGN KEY (cins_id) REFERENCES malzeme_cinsleri(id)
 );
 
@@ -22,7 +24,7 @@ CREATE TABLE IF NOT EXISTS malzemeler (
     FOREIGN KEY (material_type_id) REFERENCES malzeme_tipleri(id)
 );
 
--- 4. İş Tanımları
+-- 4. İş Tanımları (mt/TL ve Adam/dakika normları)
 CREATE TABLE IF NOT EXISTS isler (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -32,7 +34,7 @@ CREATE TABLE IF NOT EXISTS isler (
     report_template TEXT
 );
 
--- 5. Yapılan İşler
+-- 5. Yapılan İşler (Günlük aktivite logu)
 CREATE TABLE IF NOT EXISTS yapilanlar (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     job_id INTEGER,
