@@ -1,8 +1,3 @@
--- ESKİ TABLOLARI ZORLA SİLİYORUZ (Önbellekte kalma ihtimaline karşı)
-DROP TABLE IF EXISTS yapilanlar;
-DROP TABLE IF EXISTS malzemeler;
-DROP TABLE IF EXISTS malzeme_tipleri;
-
 -- 1. Malzeme Cinsleri (Kategori)
 CREATE TABLE IF NOT EXISTS malzeme_cinsleri (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

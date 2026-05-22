@@ -1,32 +1,94 @@
 'use client';
 
-import { useState } from 'react';
-import { ekleBelgeliUretici } from './actions';
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { kaydetBelgeliUretici } from './actions';
 
-export default function UreticiForm({ cinsler }: { cinsler: any[] }) {
+export default function UreticiForm({ cinsler, editData }: { cinsler: any[], editData?: any }) {
+  const router = useRouter();
+  const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [certs, setCerts] = useState([{ id: Date.now() }]);
+  
+  const [cinsName, setCinsName] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [certs, setCerts] = useState<any[]>([{ id: Date.now() }]);
+  
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [filteredCinsler, setFilteredCinsler] = useState<any[]>([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
-  const addCertBlock = () => {
-    setCerts([...certs, { id: Date.now() }]);
+  // Düzenleme modu tetiklendiğinde formu aç ve verileri doldur
+  useEffect(() => {
+    if (editData) {
+      setIsOpen(true);
+      setCinsName(editData.cins_name || '');
+      setCompanyName(editData.company_name || '');
+      try {
+        const parsed = JSON.parse(editData.certificates || '[]');
+        if (parsed.length > 0) {
+          setCerts(parsed.map((c: any, i: number) => ({ ...c, id: Date.now() + i })));
+        } else {
+          setCerts([{ id: Date.now() }]);
+        }
+      } catch {
+        setCerts([{ id: Date.now() }]);
+      }
+      // Form açıldığında sayfayı yumuşakça yukarı kaydır
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      handleReset();
+    }
+  }, [editData]);
+
+  // Arama filtresi
+  useEffect(() => {
+    if (cinsName.trim() === '') {
+      setFilteredCinsler([]);
+      setActiveIndex(-1);
+    } else {
+      setFilteredCinsler(cinsler.filter(c => c.name.toLowerCase().includes(cinsName.toLowerCase())));
+      setActiveIndex(-1);
+    }
+  }, [cinsName, cinsler]);
+
+  // Dışarı tıklama kontrolü
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || filteredCinsler.length === 0) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex(p => p < filteredCinsler.length - 1 ? p + 1 : p); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIndex(p => p > 0 ? p - 1 : -1); }
+    else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault(); 
+      setCinsName(filteredCinsler[activeIndex].name);
+      setShowSuggestions(false);
+    }
   };
 
-  const removeCertBlock = (id: number) => {
-    if (certs.length > 1) {
-      setCerts(certs.filter((c) => c.id !== id));
-    }
+  const handleReset = () => {
+    setCinsName('');
+    setCompanyName('');
+    setCerts([{ id: Date.now() }]);
+    setIsOpen(false);
+    router.push('/malzeme-tipleri'); // URL'deki edit parametresini temizle
   };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const form = e.currentTarget; 
-    const formData = new FormData(form);
-    
+    const formData = new FormData(e.currentTarget);
     try {
       setLoading(true);
-      await ekleBelgeliUretici(formData);
-      form.reset(); 
-      setCerts([{ id: Date.now() }]); 
+      await kaydetBelgeliUretici(formData);
+      handleReset();
     } catch (err: any) {
       alert('İşlem Hatası: ' + err.message);
     } finally {
@@ -35,78 +97,113 @@ export default function UreticiForm({ cinsler }: { cinsler: any[] }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-3 p-3 bg-neutral-50 rounded border border-neutral-100">
-        <div>
-          <label className="block text-[11px] text-neutral-500 font-bold mb-0.5">MALZEME CİNSİ *</label>
-          <select name="cins_id" required defaultValue="" className="w-full px-3 py-1.5 border border-neutral-200 bg-white rounded-md text-sm focus:outline-none focus:border-neutral-900">
-            <option value="" disabled>Seçiniz...</option>
-            {cinsler.map((cins) => (
-              <option key={cins.id} value={cins.id}>{cins.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-[11px] text-neutral-500 font-bold mb-0.5">BELGE SAHİBİ / MARKA *</label>
-          <input type="text" name="company_name" required placeholder="Örn: KALDE KLİMA A.Ş." className="w-full px-3 py-1.5 border border-neutral-200 rounded-md text-sm focus:outline-none focus:border-neutral-900" />
-        </div>
-      </div>
-
-      <div className="space-y-3">
-        <label className="block text-xs text-neutral-900 font-bold uppercase border-b pb-1">Standartlar ve Belgeler</label>
-        
-        {certs.map((cert) => (
-          <div key={cert.id} className="relative p-3 bg-white border border-neutral-200 rounded-md shadow-sm space-y-3">
-            {certs.length > 1 && (
-              <button 
-                type="button" 
-                onClick={() => removeCertBlock(cert.id)} 
-                className="absolute -top-2 -right-2 bg-red-100 text-red-600 hover:bg-red-600 hover:text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold transition"
-              >
-                ×
-              </button>
-            )}
-            
-            <div>
-              <label className="block text-[10px] text-neutral-400 font-semibold mb-0.5 uppercase">Standart</label>
-              <input type="text" name="standart" placeholder="Örn: TS EN 1329-1" className="w-full px-2 py-1.5 border border-neutral-200 rounded text-sm focus:outline-none" />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-[10px] text-neutral-400 font-semibold mb-0.5 uppercase">Belge No</label>
-                <input type="text" name="belge_no" placeholder="009649-TSE" className="w-full px-2 py-1.5 border border-neutral-200 rounded text-sm" />
-              </div>
-              <div>
-                <label className="block text-[10px] text-neutral-400 font-semibold mb-0.5 uppercase">Geçerlilik</label>
-                <input type="date" name="expiry_date" className="w-full px-2 py-1.5 border border-neutral-200 rounded text-sm" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] text-neutral-400 font-semibold mb-0.5 uppercase">Teknik Katalog</label>
-              <input type="file" name="catalog" accept=".pdf,image/*" className="w-full text-[11px] text-neutral-500 cursor-pointer file:mr-2 file:py-1 file:px-2 file:border-0 file:rounded file:bg-neutral-100 file:text-neutral-700 hover:file:bg-neutral-200" />
-            </div>
-          </div>
-        ))}
-
+    <div className="mb-6 print:hidden">
+      {/* FORM AÇMA/KAPAMA BUTONU */}
+      {!isOpen && (
         <button 
-          type="button" 
-          onClick={addCertBlock}
-          className="w-full py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded border-dashed transition cursor-pointer"
+          onClick={() => setIsOpen(true)}
+          className="w-full md:w-auto px-5 py-2.5 bg-neutral-900 hover:bg-neutral-800 text-white text-sm font-semibold rounded-lg shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
         >
-          + Yeni Standart/Belge Ekle
+          <span>➕</span> Yeni Üretici / Belge Ekle
         </button>
-      </div>
+      )}
 
-      <button 
-        type="submit" 
-        disabled={loading}
-        className="w-full py-2.5 text-sm font-semibold bg-neutral-900 hover:bg-neutral-800 text-white rounded-md shadow transition disabled:bg-neutral-400 cursor-pointer"
-      >
-        {loading ? 'Sisteme İşleniyor...' : 'Belgeli Üreticiyi Kaydet'}
-      </button>
-    </form>
+      {/* AÇILIR FORM ALANI */}
+      {isOpen && (
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-xl overflow-hidden transition-all duration-300 ease-in-out mt-2">
+          <div className="bg-neutral-50 px-5 py-4 border-b border-neutral-200 flex justify-between items-center">
+            <h3 className="font-bold text-neutral-800">
+              {editData ? '✏️ Üreticiyi Düzenle' : '➕ Yeni Üretici Ekle'}
+            </h3>
+            <button onClick={handleReset} className="text-neutral-400 hover:text-neutral-600 text-xl font-bold leading-none cursor-pointer">&times;</button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="p-5 space-y-6">
+            {editData && <input type="hidden" name="id" value={editData.id} />}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div ref={wrapperRef} className="relative">
+                <label className="block text-xs text-neutral-500 font-bold mb-1.5 uppercase tracking-wide">Malzeme Cinsi *</label>
+                <input 
+                  type="text" name="cins_name" required autoComplete="off"
+                  value={cinsName}
+                  onChange={(e) => { setCinsName(e.target.value); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Seçebilir veya yeni yazabilirsiniz" 
+                  className="w-full px-4 py-2.5 border border-neutral-200 bg-neutral-50/50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" 
+                />
+                {showSuggestions && filteredCinsler.length > 0 && (
+                  <ul className="absolute z-20 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-auto">
+                    {filteredCinsler.map((cins, index) => (
+                      <li key={cins.id} onMouseEnter={() => setActiveIndex(index)} onClick={() => { setCinsName(cins.name); setShowSuggestions(false); }} className={`px-4 py-2.5 text-sm cursor-pointer transition-colors ${index === activeIndex ? 'bg-blue-50 text-blue-700' : 'text-neutral-700 hover:bg-neutral-50'}`}>{cins.name}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs text-neutral-500 font-bold mb-1.5 uppercase tracking-wide">Belge Sahibi / Marka *</label>
+                <input 
+                  type="text" name="company_name" required value={companyName} onChange={e => setCompanyName(e.target.value)}
+                  placeholder="Örn: KALDE KLİMA A.Ş." 
+                  className="w-full px-4 py-2.5 border border-neutral-200 bg-neutral-50/50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-4 border-t border-neutral-100">
+              <label className="block text-sm text-neutral-800 font-bold">Standartlar ve Belgeler</label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {certs.map((cert) => (
+                  <div key={cert.id} className="relative p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 shadow-sm group">
+                    {certs.length > 1 && (
+                      <button type="button" onClick={() => setCerts(certs.filter((c) => c.id !== cert.id))} className="absolute -top-2 -right-2 bg-white border border-red-200 text-red-500 hover:bg-red-500 hover:text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-sm transition-colors cursor-pointer opacity-0 group-hover:opacity-100">&times;</button>
+                    )}
+                    
+                    {/* Eski Dosya Yolunu Tutan Gizli Input */}
+                    <input type="hidden" name="existing_catalog_path" value={cert.catalog_path || ''} />
+
+                    <div>
+                      <label className="block text-[10px] text-neutral-500 font-bold mb-1 uppercase">Standart</label>
+                      <input type="text" name="standart" defaultValue={cert.standart !== '-' ? cert.standart : ''} placeholder="Örn: TS EN 1329-1" className="w-full px-3 py-2 border border-neutral-200 rounded text-sm focus:outline-none focus:border-neutral-400" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] text-neutral-500 font-bold mb-1 uppercase">Belge No</label>
+                        <input type="text" name="belge_no" defaultValue={cert.belge_no !== '-' ? cert.belge_no : ''} placeholder="009649-TSE" className="w-full px-3 py-2 border border-neutral-200 rounded text-sm focus:outline-none focus:border-neutral-400" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-neutral-500 font-bold mb-1 uppercase">Geçerlilik</label>
+                        <input type="date" name="expiry_date" defaultValue={cert.expiry_date !== '-' ? cert.expiry_date : ''} className="w-full px-3 py-2 border border-neutral-200 rounded text-sm focus:outline-none focus:border-neutral-400 text-neutral-700" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-neutral-500 font-bold mb-1 uppercase">
+                        {cert.catalog_path ? 'Yeni Katalog Yükle (Eskisi Var)' : 'Teknik Katalog Yükle'}
+                      </label>
+                      <input type="file" name="catalog" accept=".pdf,image/*" className="w-full text-xs text-neutral-500 cursor-pointer file:mr-3 file:py-1.5 file:px-3 file:border-0 file:rounded-md file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 transition-colors" />
+                    </div>
+                  </div>
+                ))}
+                
+                {/* YENİ BLOK EKLEME BUTONU */}
+                <button type="button" onClick={() => setCerts([...certs, { id: Date.now() }])} className="min-h-[150px] p-4 text-sm font-semibold text-blue-600 bg-white hover:bg-blue-50 border-2 border-blue-100 rounded-xl border-dashed transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer">
+                  <span className="text-2xl leading-none">+</span>
+                  <span>Yeni Standart Ekle</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button type="button" onClick={handleReset} className="px-5 py-2.5 text-sm font-semibold text-neutral-700 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer">İptal</button>
+              <button type="submit" disabled={loading} className="flex-1 py-2.5 text-sm font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all disabled:opacity-70 cursor-pointer">
+                {loading ? 'İşleniyor...' : (editData ? 'Güncellemeyi Kaydet' : 'Sisteme Kaydet')}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+    </div>
   );
 }
