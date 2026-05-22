@@ -18,7 +18,7 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
   const [activeIndex, setActiveIndex] = useState(-1);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
-  // Düzenleme modu tetiklendiğinde formu aç ve verileri doldur
+  // --- DÜZENLEME MODU KONTROLÜ ---
   useEffect(() => {
     if (editData) {
       setIsOpen(true);
@@ -34,10 +34,13 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
       } catch {
         setCerts([{ id: Date.now() }]);
       }
-      // Form açıldığında sayfayı yumuşakça yukarı kaydır
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      handleReset();
+      // Yönlendirme YAPMADAN formu sessizce sıfırla
+      setIsOpen(false);
+      setCinsName('');
+      setCompanyName('');
+      setCerts([{ id: Date.now() }]);
     }
   }, [editData]);
 
@@ -79,7 +82,7 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
     setCompanyName('');
     setCerts([{ id: Date.now() }]);
     setIsOpen(false);
-    router.push('/malzeme-tipleri'); // URL'deki edit parametresini temizle
+    router.push('/malzeme-tipleri'); // URL'yi temizle
   };
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -88,7 +91,7 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
     try {
       setLoading(true);
       await kaydetBelgeliUretici(formData);
-      handleReset();
+      handleReset(); // İşlem bitince formu kapat ve URL'yi temizle
     } catch (err: any) {
       alert('İşlem Hatası: ' + err.message);
     } finally {
@@ -98,7 +101,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
 
   return (
     <div className="mb-6 print:hidden">
-      {/* FORM AÇMA/KAPAMA BUTONU */}
       {!isOpen && (
         <button 
           onClick={() => setIsOpen(true)}
@@ -108,7 +110,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
         </button>
       )}
 
-      {/* AÇILIR FORM ALANI */}
       {isOpen && (
         <div className="bg-white rounded-xl border border-neutral-200 shadow-xl overflow-hidden transition-all duration-300 ease-in-out mt-2">
           <div className="bg-neutral-50 px-5 py-4 border-b border-neutral-200 flex justify-between items-center">
@@ -161,7 +162,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                       <button type="button" onClick={() => setCerts(certs.filter((c) => c.id !== cert.id))} className="absolute -top-2 -right-2 bg-white border border-red-200 text-red-500 hover:bg-red-500 hover:text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold shadow-sm transition-colors cursor-pointer opacity-0 group-hover:opacity-100">&times;</button>
                     )}
                     
-                    {/* Eski Dosya Yolunu Tutan Gizli Input */}
                     <input type="hidden" name="existing_catalog_path" value={cert.catalog_path || ''} />
 
                     <div>
@@ -187,7 +187,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                   </div>
                 ))}
                 
-                {/* YENİ BLOK EKLEME BUTONU */}
                 <button type="button" onClick={() => setCerts([...certs, { id: Date.now() }])} className="min-h-[150px] p-4 text-sm font-semibold text-blue-600 bg-white hover:bg-blue-50 border-2 border-blue-100 rounded-xl border-dashed transition-colors flex flex-col items-center justify-center gap-2 cursor-pointer">
                   <span className="text-2xl leading-none">+</span>
                   <span>Yeni Standart Ekle</span>
