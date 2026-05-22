@@ -11,32 +11,29 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
     return selectedCinsId === '' || item.cins_id?.toString() === selectedCinsId;
   });
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleExportExcel = async () => {
     try {
         setDocLoading(true);
         const res = await fetch('/api/malzeme-onay-doc', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ materials: filteredMaterials })
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ materials: filteredMaterials })
         });
 
         if (res.ok) {
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `Malzeme_Oneri_ve_Onay_Formu_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}.xlsx`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.URL.revokeObjectURL(url);
+          const blob = await res.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `MOF_${new Date().toLocaleDateString('tr-TR').replace(/\./g, '_')}.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
         } else {
-        const data = await res.json();
-        alert('Dosya üretilirken hata oluştu: ' + data.error);
+          alert('Dosya üretilirken hata oluştu.');
         }
     } catch (err) {
         alert('Sistem yerel dosya motoruna bağlanamadı.');
@@ -50,14 +47,14 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
   return (
     <div className="space-y-6">
       
-      {/* KONTROL PANELİ */}
-      <div className="print:hidden p-4 bg-white rounded-lg border border-neutral-200 shadow-sm flex flex-wrap gap-4 items-end justify-between">
+      {/* KARANLIK FİLTRELEME VE BUTONLAR PANELİ */}
+      <div className="print:hidden p-4 bg-zinc-900 rounded-lg border border-zinc-800 flex flex-wrap gap-4 items-end justify-between shadow-sm">
         <div className="flex-1 min-w-[250px]">
-          <label className="block text-xs font-medium text-neutral-500 mb-1">Malzeme Cinsine Göre Filtrele</label>
+          <label className="block text-xs font-medium text-zinc-500 mb-1">Malzeme Cinsine Göre Filtrele</label>
           <select
             value={selectedCinsId}
             onChange={(e) => setSelectedCinsId(e.target.value)}
-            className="w-full px-3 py-1.5 border border-neutral-200 bg-white rounded-md text-sm focus:outline-none focus:border-neutral-900 transition-colors"
+            className="w-full px-3 py-1.5 border border-zinc-800 bg-zinc-950 rounded-md text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-colors"
           >
             <option value="">Tüm Cinsler / Malzemeler</option>
             {cinsler.map((cins) => (
@@ -67,18 +64,20 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
         </div>
 
         <div className="flex gap-2">
+          {/* EXCEL BUTONU */}
           <button
             onClick={handleExportExcel}
             disabled={docLoading || filteredMaterials.length === 0}
-            className="px-4 py-1.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:bg-neutral-300 cursor-pointer"
+            className="px-4 py-1.5 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:bg-zinc-700 disabled:opacity-50 cursor-pointer"
           >
-            {docLoading ? 'Excel Üretiliyor...' : '📊 Excel Olarak İndir'}
+            {docLoading ? 'Hazırlanıyor...' : '📊 Excel Olarak İndir'}
           </button>
 
+          {/* PDF BUTONU */}
           <button
             onClick={handlePrint}
             disabled={filteredMaterials.length === 0}
-            className="px-4 py-1.5 text-sm font-semibold bg-neutral-900 hover:bg-neutral-800 text-white rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:bg-neutral-300 cursor-pointer"
+            className="px-4 py-1.5 text-sm font-semibold bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-md shadow-sm transition-colors flex items-center gap-2 disabled:opacity-50 cursor-pointer border border-zinc-700"
           >
             📄 PDF / Baskı Al
           </button>
@@ -86,26 +85,19 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
       </div>
 
       {/* YAZDIRMA BAŞLIĞI */}
-      <div className="hidden print:block space-y-4 border-b-2 border-neutral-950 pb-4 mb-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-md font-bold tracking-tight text-neutral-900 uppercase">EKİNOKS MEKANİK TESİSAT SİSTEMLERİ</h1>
-          </div>
-          <div className="text-right font-mono text-xs text-neutral-700">
-            <div>Tarih: {bugun}</div>
-          </div>
-        </div>
-        <div className="text-center py-2 bg-neutral-100 border border-neutral-300 rounded">
-          <h2 className="text-md font-extrabold text-neutral-900 tracking-wider">MALZEME ÖNERİ VE ONAY FORMU (MOF)</h2>
+      <div className="hidden print:block space-y-4 border-b border-black pb-4 mb-6">
+        <div className="flex justify-between items-center text-black">
+          <h1 className="text-md font-bold uppercase">EKİNOKS MEKANİK TESİSAT SİSTEMLERİ</h1>
+          <div className="text-xs font-mono">Tarih: {bugun}</div>
         </div>
       </div>
 
-      {/* AKILLI MATRİS TABLOSU */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden print:border-0 print:shadow-none print:rounded-none">
+      {/* MİNİMALİST KARANLIK MATRİS TABLOSU */}
+      <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl overflow-hidden print:border-0 print:bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm border-collapse">
-            <thead className="bg-neutral-50/80">
-              <tr className="border-b-2 border-neutral-200 text-neutral-500 font-bold text-[11px] uppercase tracking-wider print:text-neutral-900 print:border-neutral-950">
+          <table className="w-full text-left text-sm border-collapse print:text-black">
+            <thead className="bg-zinc-950/50 print:bg-transparent">
+              <tr className="border-b border-zinc-800 text-zinc-500 font-medium text-xs uppercase tracking-wider print:border-black print:text-black">
                 <th className="py-4 pl-5 pr-3 w-1/4">MALZEME CİNSİ</th>
                 <th className="py-4 px-3 w-1/4">BELGE SAHİBİ / MARKA</th>
                 <th className="py-4 px-3">STANDART</th>
@@ -118,8 +110,8 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
             {filteredMaterials.length === 0 ? (
               <tbody>
                 <tr>
-                  <td colSpan={6} className="text-sm text-neutral-400 py-10 text-center">
-                    Henüz teknik onay matrisine veri eklenmemiş veya seçilen filtreye uygun veri yok.
+                  <td colSpan={6} className="text-sm text-zinc-600 py-16 text-center font-medium">
+                    Veri bulunamadı.
                   </td>
                 </tr>
               </tbody>
@@ -131,38 +123,42 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
                 if (certs.length === 0) certs = [{}];
 
                 return (
-                  <tbody key={item.id} className="group hover:bg-blue-50/40 transition-colors duration-200 border-b-2 border-neutral-100 last:border-b-0 print:border-b-2 print:border-neutral-300">
+                  <tbody key={item.id} className="group hover:bg-zinc-800/30 transition-colors duration-200 border-b border-zinc-800 last:border-b-0 print:border-b print:border-gray-300">
                     {certs.map((cert, idx) => {
                       const isFirst = idx === 0;
                       const isLast = idx === certs.length - 1;
 
+                      // Grup içi satırlara net ayrım için düz çizgi ve opaklık artışı
                       return (
-                        <tr key={`${item.id}-${idx}`} className={`${!isLast ? 'border-b border-neutral-100/70 border-dashed' : ''} print:border-b-0`}>
+                        <tr key={`${item.id}-${idx}`} className={`${!isLast ? 'border-b border-zinc-800/80 print:border-gray-300' : ''} print:border-b-0`}>
                           
                           {/* SADECE İLK SATIRDA GÖSTERİLECEK BİRLEŞİK HÜCRELER */}
                           {isFirst && (
                             <>
-                              <td rowSpan={certs.length} className="py-4 pl-5 pr-3 font-medium text-neutral-900 border-r border-neutral-100 align-middle print:border-r-2 print:border-neutral-300">
+                              {/* 🚀 Dikey ortalama için align-middle eklendi */}
+                              <td rowSpan={certs.length} className="py-4 pl-5 pr-3 font-medium text-zinc-200 border-r border-zinc-800/50 align-middle print:text-black print:border-gray-300">
                                 {item.cins_name}
                               </td>
-                              <td rowSpan={certs.length} className="py-4 px-3 font-bold text-neutral-800 uppercase text-[11px] border-r border-neutral-100 align-middle print:border-r-2 print:border-neutral-300">
+                              {/* 🚀 Dikey ortalama için align-middle eklendi */}
+                              <td rowSpan={certs.length} className="py-4 px-3 text-zinc-100 font-semibold uppercase text-[11px] border-r border-zinc-800/50 align-middle print:text-black print:border-gray-300">
                                 {item.company_name}
                               </td>
                             </>
                           )}
                           
                           {/* HER BİR STANDART İÇİN TEKRAR EDEN HÜCRELER */}
-                          <td className="py-3 px-3 text-sm text-neutral-700 font-medium align-middle">
+                          {/* 🚀 Genel uyum için bunlara da align-middle eklendi */}
+                          <td className="py-3 px-3 text-sm text-zinc-300 font-medium align-middle print:text-black">
                             {cert.standart || '-'}
                           </td>
-                          <td className="py-3 px-3 text-sm font-mono text-neutral-600 align-middle">
+                          <td className="py-3 px-3 text-sm font-mono text-xs text-zinc-400 align-middle print:text-black">
                             {cert.belge_no || '-'}
                           </td>
-                          <td className="py-3 px-3 text-sm text-neutral-500 align-middle">
-                            <div className="flex items-center gap-3">
+                          <td className="py-3 px-3 text-sm text-zinc-500 align-middle print:text-black">
+                            <div className="flex flex-col items-start gap-1">
                               <span>{cert.expiry_date || '-'}</span>
                               {cert.catalog_path && (
-                                <a href={cert.catalog_path} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-white border border-neutral-200 text-neutral-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 rounded-md text-[10px] uppercase font-bold transition-all shadow-sm print:hidden">
+                                <a href={cert.catalog_path} target="_blank" rel="noopener noreferrer" className="px-2 py-0.5 bg-zinc-800 border border-zinc-700 text-zinc-300 rounded text-[10px] uppercase font-bold hover:bg-zinc-700 hover:text-zinc-100 transition-colors print:hidden shadow-sm">
                                   Katalog
                                 </a>
                               )}
@@ -171,22 +167,13 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
 
                           {/* İŞLEMLER BUTONU DA SADECE İLK SATIRDA GÖZÜKSÜN */}
                           {isFirst && (
-                            <td rowSpan={certs.length} className="py-4 pr-5 pl-3 text-right align-middle print:hidden border-l border-neutral-100">
-                              <div className="flex items-center justify-end gap-2">
-                                {/* DÜZENLE BUTONU */}
-                                <Link 
-                                  href={`/malzeme-tipleri?edit=${item.id}`} 
-                                  className="text-xs font-semibold text-blue-600 hover:text-white hover:bg-blue-600 px-3 py-1.5 rounded-md transition-all border border-transparent hover:border-blue-600 cursor-pointer inline-block"
-                                >
-                                  Düzenle
-                                </Link>
-
-                                {/* SİL BUTONU */}
+                            // 🚀 Dikey ortalama için align-middle eklendi
+                            <td rowSpan={certs.length} className="py-4 pr-5 pl-3 text-right align-middle print:hidden border-l border-neutral-800/50">
+                              <div className="flex flex-col items-end gap-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                                <Link href={`/malzeme-tipleri?edit=${item.id}`} className="text-xs text-zinc-400 hover:text-zinc-100">Düzenle</Link>
                                 <form action={silUreticiAction}>
                                   <input type="hidden" name="id" value={item.id} />
-                                  <button type="submit" className="text-xs font-semibold text-red-500 hover:text-white hover:bg-red-500 px-3 py-1.5 rounded-md transition-all border border-transparent hover:border-red-500 cursor-pointer">
-                                    Sil
-                                  </button>
+                                  <button type="submit" className="text-xs text-red-500/80 hover:text-red-400 cursor-pointer">Sil</button>
                                 </form>
                               </div>
                             </td>
@@ -202,12 +189,6 @@ export default function MatrisTable({ belgeliMalzemeler, cinsler, silUreticiActi
         </div>
       </div>
 
-      {/* YAZDIRMA İMZA ALANI */}
-      <div className="hidden print:grid grid-cols-3 gap-6 pt-16 text-center text-xs font-semibold">
-        <div><p className="text-neutral-500">HAZIRLAYAN (YÜKLENİCİ)</p><p className="mt-8 text-neutral-900">Ekinoks Mekanik A.Ş.</p></div>
-        <div><p className="text-neutral-500">İNCELEYEN (MÜŞAVİR)</p><p className="mt-8 text-neutral-400">□ ONAYLANDI</p></div>
-        <div><p className="text-neutral-500">ONAYLAYAN (İŞVEREN)</p><p className="mt-8 text-neutral-300">______</p></div>
-      </div>
     </div>
   );
 }

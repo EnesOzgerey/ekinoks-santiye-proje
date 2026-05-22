@@ -18,9 +18,10 @@ export default async function MalzemeTipleriPage({ searchParams }: { searchParam
   const editData = editId ? belgeliMalzemeler.find(m => m.id.toString() === editId) : null;
 
   return (
-    // Fazladan arka plan renkleri kaldırıldı, sadece içerik hizalaması bırakıldı
+    // Ana içerik alanı sarmalayıcısı (p-6 max-w-[1600px] mx-auto)
     <div className="p-6 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-500">
       
+      {/* BAŞLIK VE ALT METİN (RENKLER GÜNCELLENDİ) */}
       <div className="print:hidden pb-4 border-b border-zinc-800/50 flex justify-between items-end">
         <div>
           <h1 className="text-2xl font-semibold text-zinc-100 tracking-tight">Teknik Onay Matrisi</h1>
@@ -28,8 +29,10 @@ export default async function MalzemeTipleriPage({ searchParams }: { searchParam
         </div>
       </div>
 
+      {/* FORM ALANI */}
       <UreticiForm cinsler={cinsler} editData={editData} />
 
+      {/* KARANLIK MATRİS TABLOSU (Aşağıda güncelleyeceğiz) */}
       <div className="w-full">
         <MatrisTable belgeliMalzemeler={belgeliMalzemeler} cinsler={cinsler} silUreticiAction={silUretici} />
       </div>
