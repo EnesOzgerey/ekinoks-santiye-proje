@@ -5,11 +5,13 @@ import { revalidatePath } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
 
-// Ekleme ve Güncelleme İşlemini Tek Fonksiyonda Birleştirdik
 export async function kaydetBelgeliUretici(formData: FormData) {
-  const id = formData.get('id') as string; // Varsa düzenleme modudur
+  const id = formData.get('id') as string; 
   const cins_name = formData.get('cins_name') as string;
   const company_name = formData.get('company_name') as string;
+  
+  // YENİ: Formdan status gelmezse (yeni kayıtsa) otomatik "Onay Bekliyor" olur
+  const status = (formData.get('status') as string) || 'Onay Bekliyor';
 
   const standarts = formData.getAll('standart') as string[];
   const belge_nos = formData.getAll('belge_no') as string[];
@@ -21,7 +23,6 @@ export async function kaydetBelgeliUretici(formData: FormData) {
     throw new Error('Malzeme cinsi ve marka adı zorunludur.');
   }
 
-  // --- AKILLI CİNS YAKALAYICI ---
   let cins_id: number;
   const cinsNameTrimmed = cins_name.trim();
   const existingCins = db.prepare('SELECT id FROM malzeme_cinsleri WHERE LOWER(name) = LOWER(?)').get(cinsNameTrimmed) as { id: number } | undefined;
@@ -34,14 +35,12 @@ export async function kaydetBelgeliUretici(formData: FormData) {
     cins_id = info.lastInsertRowid as number;
   }
 
-  // --- SERTİFİKA VE DOSYA İŞLEME ---
   const certificates = [];
 
   for (let i = 0; i < standarts.length; i++) {
-    let catalog_path = existing_catalogs[i] || null; // Eski dosya varsa koru
+    let catalog_path = existing_catalogs[i] || null; 
     const file = catalogs[i];
 
-    // Yeni dosya yüklendiyse eskisinin üzerine yaz
     if (file && file.size > 0) {
       const bytes = await file.arrayBuffer();
       const buffer = Buffer.from(bytes);
@@ -71,20 +70,20 @@ export async function kaydetBelgeliUretici(formData: FormData) {
     certificates.push({ standart: '-', belge_no: '-', expiry_date: '-', catalog_path: null });
   }
 
-  // --- VERİTABANINA YAZMA (INSERT VEYA UPDATE) ---
+  // YENİ: UPDATE ve INSERT sorgularına "status" eklendi
   if (id) {
     const update = db.prepare(`
       UPDATE malzeme_tipleri 
-      SET cins_id = ?, company_name = ?, certificates = ?
+      SET cins_id = ?, company_name = ?, certificates = ?, status = ?
       WHERE id = ?
     `);
-    update.run(cins_id, company_name, JSON.stringify(certificates), id);
+    update.run(cins_id, company_name, JSON.stringify(certificates), status, id);
   } else {
     const insert = db.prepare(`
-      INSERT INTO malzeme_tipleri (cins_id, company_name, certificates)
-      VALUES (?, ?, ?)
+      INSERT INTO malzeme_tipleri (cins_id, company_name, certificates, status)
+      VALUES (?, ?, ?, ?)
     `);
-    insert.run(cins_id, company_name, JSON.stringify(certificates));
+    insert.run(cins_id, company_name, JSON.stringify(certificates), status);
   }
 
   revalidatePath('/malzeme-tipleri');

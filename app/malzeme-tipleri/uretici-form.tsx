@@ -151,6 +151,22 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                   className="w-full px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 focus:ring-1 focus:ring-zinc-600 transition-all placeholder:text-zinc-600" 
                 />
               </div>
+
+              {/* DURUM SEÇİCİ (SADECE DÜZENLEME MODUNDA GÖRÜNÜR) */}
+              {editData && (
+                <div className="md:col-span-2 pt-4 border-t border-zinc-800/50 mt-2">
+                  <label className="block text-[10px] text-zinc-400 font-bold mb-2 uppercase tracking-wider">Onay Durumu</label>
+                  <select 
+                    name="status" 
+                    defaultValue={editData.status || 'Onay Bekliyor'} 
+                    className="w-full md:w-1/2 px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-all cursor-pointer"
+                  >
+                    <option value="Onay Bekliyor">⏳ Onay Bekliyor</option>
+                    <option value="Onaylandı">✅ Onaylandı</option>
+                    <option value="Reddedildi">❌ Reddedildi</option>
+                  </select>
+                </div>
+              )}
             </div>
 
             <div className="space-y-4 pt-4 border-t border-zinc-800/50">
@@ -177,7 +193,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                       </div>
                       <div>
                         <label className="block text-[10px] text-zinc-500 font-bold mb-1.5 uppercase tracking-wider">Geçerlilik</label>
-                        {/* [color-scheme:dark] tarayıcının takvimini de karanlık moda geçirir */}
                         <input type="date" name="expiry_date" defaultValue={cert.expiry_date !== '-' ? cert.expiry_date : ''} className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-md text-sm text-zinc-400 focus:outline-none focus:border-zinc-600 [color-scheme:dark]" />
                       </div>
                     </div>
