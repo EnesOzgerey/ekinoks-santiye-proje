@@ -97,7 +97,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
 
   return (
     <div className="print:hidden">
-      {/* AÇMA BUTONU */}
       {!isOpen && (
         <button 
           onClick={() => setIsOpen(true)}
@@ -109,7 +108,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
 
       {isOpen && (
         <div className="bg-zinc-900 border border-zinc-800/80 rounded-xl overflow-hidden mt-4 shadow-2xl">
-          {/* FORM BAŞLIĞI */}
           <div className="px-6 py-4 border-b border-zinc-800/80 flex justify-between items-center bg-zinc-950/30">
             <h3 className="font-semibold text-zinc-100">
               {editData ? 'Üreticiyi Düzenle' : 'Yeni Üretici Ekle'}
@@ -121,7 +119,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
             {editData && <input type="hidden" name="id" value={editData.id} />}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* MALZEME CİNSİ İNPUTU */}
               <div ref={wrapperRef} className="relative">
                 <label className="block text-[10px] text-zinc-400 font-bold mb-2 uppercase tracking-wider">Malzeme Cinsi *</label>
                 <input 
@@ -142,7 +139,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                 )}
               </div>
 
-              {/* MARKA İNPUTU */}
               <div>
                 <label className="block text-[10px] text-zinc-400 font-bold mb-2 uppercase tracking-wider">Belge Sahibi / Marka *</label>
                 <input 
@@ -152,7 +148,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                 />
               </div>
 
-              {/* DURUM SEÇİCİ (SADECE DÜZENLEME MODUNDA GÖRÜNÜR) */}
               {editData && (
                 <div className="md:col-span-2 pt-4 border-t border-zinc-800/50 mt-2">
                   <label className="block text-[10px] text-zinc-400 font-bold mb-2 uppercase tracking-wider">Onay Durumu</label>
@@ -161,6 +156,7 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                     defaultValue={editData.status || 'Onay Bekliyor'} 
                     className="w-full md:w-1/2 px-4 py-2.5 bg-zinc-950 border border-zinc-800 rounded-lg text-sm text-zinc-200 focus:outline-none focus:border-zinc-600 transition-all cursor-pointer"
                   >
+                    <option value="Sunulmadı">📝 Sunulmadı</option>
                     <option value="Onay Bekliyor">⏳ Onay Bekliyor</option>
                     <option value="Onaylandı">✅ Onaylandı</option>
                     <option value="Reddedildi">❌ Reddedildi</option>
@@ -172,8 +168,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
             <div className="space-y-4 pt-4 border-t border-zinc-800/50">
               <label className="block text-sm text-zinc-300 font-semibold">Standartlar ve Belgeler</label>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                
-                {/* EKLENEN BELGE KARTLARI */}
                 {certs.map((cert) => (
                   <div key={cert.id} className="relative p-5 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 group hover:border-zinc-700 transition-colors">
                     {certs.length > 1 && (
@@ -205,7 +199,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
                   </div>
                 ))}
                 
-                {/* YENİ STANDART EKLEME BUTONU KARTI */}
                 <button type="button" onClick={() => setCerts([...certs, { id: Date.now() }])} className="min-h-[200px] p-4 text-sm font-medium text-zinc-500 hover:text-zinc-300 bg-zinc-950/50 hover:bg-zinc-900 border border-zinc-800 rounded-xl border-dashed hover:border-zinc-600 transition-colors flex flex-col items-center justify-center gap-3 cursor-pointer">
                   <span className="text-2xl font-light leading-none">+</span>
                   <span>Yeni Standart Ekle</span>
@@ -213,7 +206,6 @@ export default function UreticiForm({ cinsler, editData }: { cinsler: any[], edi
               </div>
             </div>
 
-            {/* ALT BUTONLAR */}
             <div className="flex justify-end gap-3 pt-6 border-t border-zinc-800/50">
               <button type="button" onClick={handleReset} className="px-6 py-2.5 text-sm font-medium text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors cursor-pointer">İptal</button>
               <button type="submit" disabled={loading} className="px-8 py-2.5 text-sm font-bold bg-zinc-100 hover:bg-white text-zinc-950 rounded-lg shadow-lg transition-all disabled:opacity-50 cursor-pointer">
