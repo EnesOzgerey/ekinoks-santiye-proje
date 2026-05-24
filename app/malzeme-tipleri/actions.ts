@@ -3,11 +3,9 @@
 import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 
-/**
- * Malzeme türünü kaydeder veya günceller (Upsert mantığı)
- */
 export async function kaydetMalzeme(formData: FormData) {
-  const idStr = formData.get('id');
+  // HATA ÇÖZÜMÜ: TypeScript'in kızmaması için 'as string' ile kesin tür veriyoruz
+  const idStr = formData.get('id') as string | null;
   const cins = formData.get('cins') as string;
   const standart = formData.get('standart') as string;
   const birim = formData.get('birim') as string;
@@ -17,36 +15,24 @@ export async function kaydetMalzeme(formData: FormData) {
   }
 
   if (idStr) {
-    // 1. DURUM: ID varsa mevcut kaydı güncelle (Inline Düzenleme)
     const id = parseInt(idStr, 10);
+    // DİKKAT 2: Eğer veritabanındaki modelin adı 'Malzeme' değilse (örn: MalzemeTipi), 
+    // aşağıdaki 'prisma.malzeme' kısmını 'prisma.malzemeTipi' olarak değiştirmelisin!
     await prisma.malzeme.update({
       where: { id },
-      data: {
-        cins,
-        standart,
-        birim,
-      },
+      data: { cins, standart, birim },
     });
   } else {
-    // 2. DURUM: ID yoksa yeni kayıt oluştur (Inline Ekleme)
     await prisma.malzeme.create({
-      data: {
-        cins,
-        standart,
-        birim,
-      },
+      data: { cins, standart, birim },
     });
   }
 
-  // Arayüzdeki tablonun anlık olarak güncellenmesi için önbelleği temizle
   revalidatePath('/malzeme-tipleri');
 }
 
-/**
- * Belirtilen malzemeyi veritabanından siler
- */
 export async function silMalzeme(formData: FormData) {
-  const idStr = formData.get('id');
+  const idStr = formData.get('id') as string | null;
   
   if (!idStr) {
     throw new Error('Silinecek kayda ait ID bulunamadı.');
@@ -58,6 +44,5 @@ export async function silMalzeme(formData: FormData) {
     where: { id },
   });
 
-  // Arayüzdeki tablonun anlık olarak güncellenmesi için önbelleği temizle
   revalidatePath('/malzeme-tipleri');
 }

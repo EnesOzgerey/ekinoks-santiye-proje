@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 1. MALZEME TİPLERİ TABLOSU
+model Malzeme {
+  id        Int      @id @default(autoincrement())
+  cins      String
+  standart  String
+  birim     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// 2. GÜNLÜK İMALAT TABLOSU
+model Imalat {
+  id                 Int      @id @default(autoincrement())
+  imalat_adi         String
+  tarih              String
+  calisan_sayisi     Int
+  kullanilan_malzeme String?
+  imalat_yeri        String?
+  metraj             String?
+  photos             String?  // Çoklu fotoğrafların Base64 veya URL'lerini dizi (JSON) olarak tutar
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
