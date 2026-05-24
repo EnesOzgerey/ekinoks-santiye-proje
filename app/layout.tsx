@@ -42,7 +42,7 @@ export default function RootLayout({
               <Link href="#" className="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 transition-colors">
                 İş Kalemleri (Norm)
               </Link>
-              <Link href="#" className="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 transition-colors">
+              <Link href="/gunluk-imalat" className="flex items-center px-4 py-2.5 text-sm font-medium rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50 transition-colors">
                 Günlük İmalat
               </Link>
             </nav>
