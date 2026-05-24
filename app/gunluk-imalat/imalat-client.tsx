@@ -18,7 +18,7 @@ export default function ImalatClient({ imalatlar }: { imalatlar: any[] }) {
   // --- FOTOĞRAF GÖRÜNTÜLEYİCİ VE SATIR GENİŞLETME ---
   const [activePhotos, setActivePhotos] = useState<string[] | null>(null);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
-  const [expandedRowId, setExpandedRowId] = useState<number | null>(null); // Sadece 1 satırın fotoğrafları açılsın diye
+  const [expandedRowId, setExpandedRowId] = useState<number | null>(null); // Sadece 1 satırın fotoğrafları açılsın
   
   // --- FORM VE DÜZENLEME DURUMU ---
   const [loading, setLoading] = useState(false);
@@ -83,7 +83,8 @@ export default function ImalatClient({ imalatlar }: { imalatlar: any[] }) {
         a.remove();
         window.URL.revokeObjectURL(url);
       } else {
-        alert('Dosya üretilirken hata oluştu.');
+        const errorData = await res.json().catch(() => ({}));
+        alert(`Sunucu Hatası: ${errorData.error || 'Dosya oluşturulamadı.'}`);
       }
     } catch (err) {
       alert('Sistem yerel dosya motoruna bağlanamadı.');
@@ -263,7 +264,6 @@ export default function ImalatClient({ imalatlar }: { imalatlar: any[] }) {
                   const displayDate = item.tarih ? item.tarih.split('-').reverse().join('.') : '-';
                   const isExpanded = expandedRowId === item.id;
                   
-                  // Satır kapalıysa en fazla 3 fotoğraf göster, açıksa hepsini göster
                   const visiblePhotos = isExpanded ? parsedPhotos : parsedPhotos.slice(0, 3);
                   const hasMorePhotos = parsedPhotos.length > 3;
 
@@ -280,44 +280,40 @@ export default function ImalatClient({ imalatlar }: { imalatlar: any[] }) {
                         {item.calisan_sayisi > 0 ? <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-zinc-800 text-zinc-300 font-bold text-xs border border-zinc-700 print:border-0 print:bg-transparent print:p-0">{item.calisan_sayisi}</span> : '-'}
                       </td>
                       
-                      {/* YENİ NESİL AKORDEON FOTOĞRAF HÜCRESİ */}
-                      {/* YENİ NESİL AKORDEON FOTOĞRAF HÜCRESİ */}
-                        <td className="py-4 px-3 align-middle print:hidden">
+                      {/* AKORDEON FOTOĞRAF HÜCRESİ */}
+                      <td className="py-4 px-3 align-middle print:hidden">
                         {parsedPhotos.length > 0 ? (
-                            <div className="flex items-start gap-2">
-                            
-                            {/* Kapalıyken tek satır (flex-nowrap), açıkken çoklu satır (flex-wrap) */}
+                          <div className="flex items-start gap-2">
                             <div className={`flex gap-1.5 flex-1 ${isExpanded ? 'flex-wrap' : 'flex-nowrap'}`}>
-                                {visiblePhotos.map((p, idx) => (
+                              {visiblePhotos.map((p, idx) => (
                                 <div 
-                                    key={idx} 
-                                    onClick={() => openLightbox(parsedPhotos, idx)}
-                                    className="w-9 h-9 rounded-md overflow-hidden border border-zinc-700 cursor-pointer hover:border-blue-500 hover:shadow-[0_0_8px_rgba(59,130,246,0.5)] transition-all shrink-0 bg-zinc-950"
+                                  key={idx} 
+                                  onClick={() => openLightbox(parsedPhotos, idx)}
+                                  className="w-9 h-9 rounded-md overflow-hidden border border-zinc-700 cursor-pointer hover:border-blue-500 hover:shadow-[0_0_8px_rgba(59,130,246,0.5)] transition-all shrink-0 bg-zinc-950"
                                 >
-                                    <img src={p} alt={`foto-${idx}`} className="w-full h-full object-cover hover:scale-110 transition-transform" />
+                                  <img src={p} alt={`foto-${idx}`} className="w-full h-full object-cover hover:scale-110 transition-transform" />
                                 </div>
-                                ))}
+                              ))}
                             </div>
                             
-                            {/* Genişletme/Daraltma Oku (Sadece 3'ten fazla resim varsa) */}
                             {hasMorePhotos && (
-                                <button 
+                              <button 
                                 onClick={() => setExpandedRowId(isExpanded ? null : item.id)}
                                 className="p-1 mt-0.5 text-zinc-400 hover:text-white bg-zinc-800/50 hover:bg-zinc-700 border border-zinc-700/50 rounded transition-colors shrink-0 cursor-pointer shadow-sm"
                                 title={isExpanded ? "Daralt" : "Tümünü Gör"}
-                                >
+                              >
                                 {isExpanded ? (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
                                 ) : (
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
                                 )}
-                                </button>
+                              </button>
                             )}
-                            </div>
+                          </div>
                         ) : (
-                            <span className="text-zinc-600 text-[11px] font-medium italic">Yok</span>
+                          <span className="text-zinc-600 text-[11px] font-medium italic">Yok</span>
                         )}
-                        </td>
+                      </td>
 
                       <td className="py-4 px-5 text-right align-middle print:hidden">
                         <div className="flex justify-end gap-2 opacity-50 hover:opacity-100 transition-opacity">

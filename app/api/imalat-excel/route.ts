@@ -1,4 +1,3 @@
-// app/api/imalat-excel/route.ts
 import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import path from 'path';
@@ -12,158 +11,189 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Dışa aktarılacak veri bulunamadı.' }, { status: 400 });
     }
 
+    // 1. ŞABLON DOSYASINI OKU
     const templatePath = path.join(process.cwd(), 'public', 'santiye_defteri_sablon.xlsx');
     
     if (!fs.existsSync(templatePath)) {
-      return NextResponse.json({ error: 'santiye_defteri_sablon.xlsx dosyası public klasöründe bulunamadı!' }, { status: 404 });
+      return NextResponse.json({ error: 'santiye_defteri_sablon.xlsx dosyası bulunamadı!' }, { status: 404 });
     }
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(templatePath);
     const templateSheet = workbook.worksheets[0];
-
-    // Verileri Tarihlerine Göre Grupla
-    const groupedData: Record<string, any[]> = {};
     
+    if (!templateSheet) {
+        throw new Error("Şablon sayfası okunamadı.");
+    }
+
+    // 2. VERİLERİ TARİHLERE GÖRE GRUPLA
+    const groupedData: Record<string, any[]> = {};
     imalatlar.forEach((item: any) => {
       let dateKey = 'Tarihsiz';
-      if (item.tarih && typeof item.tarih === 'string') {
+      if (item.tarih) {
         const parts = item.tarih.split('-');
-        if (parts.length === 3) {
-          dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY Formatı
-        } else {
-          dateKey = item.tarih;
-        }
+        if (parts.length === 3) dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY
       }
-
       dateKey = dateKey.replace(/[\\/*?:\[\]]/g, '_').substring(0, 31);
-
-      if (!groupedData[dateKey]) {
-        groupedData[dateKey] = [];
-      }
+      
+      if (!groupedData[dateKey]) groupedData[dateKey] = [];
       groupedData[dateKey].push(item);
     });
 
     const sortedDates = Object.keys(groupedData).sort();
 
-    // Şablonun merge kurallarını ve medya (görsel/logo) katmanını önceden hafızaya alalım
-    const templateMerges = (templateSheet as any).model.merges || [];
+    // Şablonun sınırlarını ve özelliklerini hafızaya al
+    const templateMerges = templateSheet.model ? [...(templateSheet.model.merges || [])] : [];
     const templateImages = templateSheet.getImages() || [];
+    const maxRows = Math.max(templateSheet.rowCount, 120); 
+    const maxCols = Math.max(templateSheet.columnCount, 20);
 
-    for (const date of sortedDates) {
-      const newSheet = workbook.addWorksheet(date);
+    // 3. GÜNLERİ VEYA SAYFALARI İŞLE
+    for (let i = 0; i < sortedDates.length; i++) {
+      const date = sortedDates[i];
+      const items = groupedData[date];
+      let sheet;
 
-      // 1. SÜTUN GENİŞLİKLERİNİ VE GİZLİLİK DURUMLARINI KOPYALA
-      const maxColumns = Math.max(templateSheet.columnCount, 26);
-      for (let i = 1; i <= maxColumns; i++) {
-        const tCol = templateSheet.getColumn(i);
-        const nCol = newSheet.getColumn(i);
-        if (tCol.width) nCol.width = tCol.width;
-        if (tCol.hidden) nCol.hidden = tCol.hidden;
-      }
-
-      // 2. SATIRLARI VE HÜCRELERİ STİLLERİYLE BİRLİKTE DERİN KOPYALA (DEEP CLONE)
-      const maxTemplateRow = Math.max(templateSheet.rowCount, 120); // Tüm şablon yapısını garantiye almak için
-      
-      for (let r = 1; r <= maxTemplateRow; r++) {
-        const tRow = templateSheet.getRow(r);
-        const nRow = newSheet.getRow(r);
+      if (i === 0) {
+        // 1. KURAL: İlk sayfanın adını doğrudan değiştir
+        sheet = templateSheet;
+        sheet.name = date;
+      } else {
+        // 2. KURAL: Diğer günler için yeni boş sayfa aç ve şablonu kopyala
+        sheet = workbook.addWorksheet(date);
         
-        if (tRow.height) nRow.height = tRow.height;
-        if (tRow.hidden) nRow.hidden = tRow.hidden;
+        // Sütun genişliklerini aktar
+        sheet.columns = templateSheet.columns.map(col => ({
+          width: col.width,
+          style: col.style,
+          hidden: col.hidden
+        }));
 
-        tRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-          const newCell = nRow.getCell(colNumber);
-          newCell.value = cell.value;
+        // MÜKEMMEL KENARLIK VE STİL KOPYALAMA DÖNGÜSÜ
+        for (let r = 1; r <= maxRows; r++) {
+          const tRow = templateSheet.getRow(r);
+          const nRow = sheet.getRow(r);
           
-          // ExcelJS referans hatasını çözmek için biçimlendirmeleri JSON üzerinden klonluyoruz
-          if (cell.font) newCell.font = JSON.parse(JSON.stringify(cell.font));
-          if (cell.fill) newCell.fill = JSON.parse(JSON.stringify(cell.fill));
-          if (cell.border) newCell.border = JSON.parse(JSON.stringify(cell.border));
-          if (cell.alignment) newCell.alignment = JSON.parse(JSON.stringify(cell.alignment));
-          if (cell.numFormat) newCell.numFormat = cell.numFormat;
+          if (tRow.height) nRow.height = tRow.height;
+          if (tRow.hidden) nRow.hidden = tRow.hidden;
+
+          for (let c = 1; c <= maxCols; c++) {
+            const tCell = tRow.getCell(c);
+            const nCell = nRow.getCell(c);
+            
+            nCell.value = tCell.value;
+            
+            if (tCell.style) {
+              // Kenarlıkları parça parça ve eksiksiz aktarmak için nesne eşlemesi yapıyoruz
+              nCell.style = {
+                font: tCell.font ? { ...tCell.font } : undefined,
+                fill: tCell.fill ? { ...tCell.fill } : undefined,
+                alignment: tCell.alignment ? { ...tCell.alignment } : undefined,
+                numFormat: tCell.numFormat,
+                border: tCell.border ? {
+                  top: tCell.border.top ? { ...tCell.border.top } : undefined,
+                  left: tCell.border.left ? { ...tCell.border.left } : undefined,
+                  bottom: tCell.border.bottom ? { ...tCell.border.bottom } : undefined,
+                  right: tCell.border.right ? { ...tCell.border.right } : undefined,
+                  diagonal: tCell.border.diagonal ? { ...tCell.border.diagonal } : undefined
+                } : undefined
+              };
+            }
+          }
+        }
+
+        // Hücre birleştirmelerini aktar
+        templateMerges.forEach((m: string) => {
+          try { sheet.mergeCells(m); } catch (e) {}
+        });
+
+        // Görselleri aktar
+        templateImages.forEach((img) => {
+          try { sheet.addImage(Number(img.imageId), img.range); } catch (e) {}
         });
       }
 
-      // 3. HÜCRE BİRLEŞTİRMELERİNİ (MERGE) AKTAR
-      templateMerges.forEach((m: string) => {
-        try { newSheet.mergeCells(m); } catch (e) {}
-      });
-
-      // 4. BAŞLIKTAKİ LOGO VE SAHA GÖRSELLERİNİ KOPYALA
-      templateImages.forEach((img) => {
-        try {
-          const imgObj = workbook.getImage(Number(img.imageId));
-          if (imgObj) {
-            const newImgId = workbook.addImage({
-              buffer: imgObj.buffer as Buffer,
-              extension: imgObj.extension,
-            });
-            newSheet.addImage(newImgId, img.range);
-          }
-        } catch (e) {
-          console.warn('Şablon görseli kopyalanamadı:', e);
+      // KURAL 1 KORUMASI: Sayfa Sonu Önizleme ve Baskı Alanı Ayarları (İlk sayfa dahil hepsine zorla basıyoruz)
+      sheet.views = [
+        { 
+          state: 'pageBreakPreview', 
+          showGridLines: true
         }
-      });
+      ];
 
-      // 5. İMALAT VERİLERİNİ 49. SATIRDAN İTİBAREN ENJEKTE ET
-      const items = groupedData[date];
-      const startRow = 49;
+      sheet.pageSetup = {
+        printArea: 'B2:K69',
+        fitToPage: true,
+        fitToWidth: 1,
+        fitToHeight: 1,
+        orientation: templateSheet.pageSetup?.orientation || 'portrait',
+        paperSize: templateSheet.pageSetup?.paperSize || 9
+      };
 
+      // 4. GÜNLÜK İMALAT VERİLERİNİ YAZ
+      let startRow = 49;
       items.forEach((item, index) => {
-        const currentRowNum = startRow + index;
-        const currentRow = newSheet.getRow(currentRowNum);
-
-        // Aynı gün birden fazla imalat varsa, 49. satırın formatını alt satırlara da klonla
+        const rowNum = startRow + index;
+        const row = sheet.getRow(rowNum);
+        
+        // Çoklu iş kalemlerinde 49. satırın stilini/kenarlıklarını aşağıya tam klonla
         if (index > 0) {
-          const baseRow = newSheet.getRow(startRow);
-          currentRow.height = baseRow.height;
-          
-          baseRow.eachCell({ includeEmpty: true }, (cell, colNum) => {
-            const newCell = currentRow.getCell(colNum);
-            if (cell.font) newCell.font = JSON.parse(JSON.stringify(cell.font));
-            if (cell.fill) newCell.fill = JSON.parse(JSON.stringify(cell.fill));
-            if (cell.border) newCell.border = JSON.parse(JSON.stringify(cell.border));
-            if (cell.alignment) newCell.alignment = JSON.parse(JSON.stringify(cell.alignment));
-          });
-
-          // 49. satırın yatay birleştirme (merge) kurallarını alt satırlara uyarla
-          templateMerges.forEach((m: string) => {
-            const match = m.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
-            if (match) {
-              const sCol = match[1], sRow = parseInt(match[2]);
-              const eCol = match[3], eRow = parseInt(match[4]);
+            const baseRow = sheet.getRow(startRow);
+            row.height = baseRow.height;
+            
+            for (let c = 1; c <= maxCols; c++) {
+              const baseCell = baseRow.getCell(c);
+              const targetCell = row.getCell(c);
               
-              if (sRow === startRow && eRow === startRow) {
-                try { newSheet.mergeCells(`${sCol}${currentRowNum}:${eCol}${currentRowNum}`); } catch (e) {}
+              if (baseCell.style) {
+                targetCell.style = {
+                  font: baseCell.font ? { ...baseCell.font } : undefined,
+                  fill: baseCell.fill ? { ...baseCell.fill } : undefined,
+                  alignment: baseCell.alignment ? { ...baseCell.alignment } : undefined,
+                  numFormat: baseCell.numFormat,
+                  border: baseCell.border ? {
+                    top: baseCell.border.top ? { ...baseCell.border.top } : undefined,
+                    left: baseCell.border.left ? { ...baseCell.border.left } : undefined,
+                    bottom: baseCell.border.bottom ? { ...baseCell.border.bottom } : undefined,
+                    right: baseCell.border.right ? { ...baseCell.border.right } : undefined
+                  } : undefined
+                };
               }
             }
-          });
+
+            // 49. satırdaki merge kurallarını kopyala
+            templateMerges.forEach((m) => {
+              const match = m.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
+              if (match) {
+                const sCol = match[1], sRow = parseInt(match[2]);
+                const eCol = match[3], eRow = parseInt(match[4]);
+                if (sRow === startRow && eRow === startRow) {
+                  try { sheet.mergeCells(`${sCol}${rowNum}:${eCol}${rowNum}`); } catch (e) {}
+                }
+              }
+            });
         }
 
-        // Verileri şablon düzenine göre hücrelere mühürle
-        currentRow.getCell('B').value = item.imalat_yeri || '-';
-        currentRow.getCell('C').value = item.imalat_adi || '-';
-        currentRow.getCell('J').value = 'EKİNOKS MEKANİK';
-        currentRow.getCell('K').value = item.calisan_sayisi || 0;
+        // Değer atamaları
+        row.getCell(2).value = item.imalat_yeri || '-';
+        row.getCell(3).value = item.imalat_adi || '-';
+        row.getCell(10).value = 'EKİNOKS MEKANİK';
+        row.getCell(11).value = item.calisan_sayisi || 0;
       });
     }
 
-    // Çıktı dosyasında ham şablon sekmesinin kalmaması için orijinal sayfayı kaldırıyoruz
-    workbook.removeWorksheet(templateSheet.id);
-
+    // 5. DOSYAYI KAYDET VE GÖNDER
     const buffer = await workbook.xlsx.writeBuffer();
-
     return new Response(buffer, {
       status: 200,
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'Content-Disposition': 'attachment; filename="Gunluk_Santiye_Defteri.xlsx"',
+        'Content-Disposition': 'attachment; filename="Santiye_Defteri.xlsx"',
       },
     });
 
   } catch (error: any) {
-    console.error('Şablon Tasarım Hatası:', error);
-    return NextResponse.json({ error: 'Excel şablonu işlenirken hata oluştu: ' + error.message }, { status: 500 });
+    console.error('Excel İşlem Hatası:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
