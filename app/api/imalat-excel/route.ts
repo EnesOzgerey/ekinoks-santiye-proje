@@ -26,13 +26,23 @@ export async function POST(request: Request) {
         throw new Error("Şablon sayfası okunamadı.");
     }
 
+    // ÇIKTININ ALINDIĞI GÜNÜN TARİH VE GÜN BİLGİSİ
+    const bugun = new Date();
+    const gun = String(bugun.getDate()).padStart(2, '0');
+    const ay = String(bugun.getMonth() + 1).padStart(2, '0');
+    const yil = bugun.getFullYear();
+    const cıktiTarihi = `${gun}.${ay}.${yil}`; // DD.MM.YYYY formatı
+
+    const gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
+    const cıktiGunAdi = gunler[bugun.getDay()];
+
     // 2. VERİLERİ TARİHLERE GÖRE GRUPLA
     const groupedData: Record<string, any[]> = {};
     imalatlar.forEach((item: any) => {
       let dateKey = 'Tarihsiz';
       if (item.tarih) {
         const parts = item.tarih.split('-');
-        if (parts.length === 3) dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY
+        if (parts.length === 3) dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`;
       }
       dateKey = dateKey.replace(/[\\/*?:\[\]]/g, '_').substring(0, 31);
       
@@ -55,21 +65,23 @@ export async function POST(request: Request) {
       let sheet;
 
       if (i === 0) {
-        // 1. KURAL: İlk sayfanın adını doğrudan değiştir
         sheet = templateSheet;
         sheet.name = date;
       } else {
-        // 2. KURAL: Diğer günler için yeni boş sayfa aç ve şablonu kopyala
         sheet = workbook.addWorksheet(date);
         
+        sheet.properties = templateSheet.properties;
+        sheet.pageSetup = templateSheet.pageSetup;
+        
         // Sütun genişliklerini aktar
-        sheet.columns = templateSheet.columns.map(col => ({
-          width: col.width,
-          style: col.style,
-          hidden: col.hidden
-        }));
+        for (let c = 1; c <= maxCols; c++) {
+          const tCol = templateSheet.getColumn(c);
+          const nCol = sheet.getColumn(c);
+          if (tCol.width) nCol.width = tCol.width;
+          if (tCol.hidden) nCol.hidden = tCol.hidden;
+        }
 
-        // MÜKEMMEL KENARLIK VE STİL KOPYALAMA DÖNGÜSÜ
+        // BAĞIMSIZ STİL KOPYALAMA DÖNGÜSÜ (Borders Çakışmasını Önler)
         for (let r = 1; r <= maxRows; r++) {
           const tRow = templateSheet.getRow(r);
           const nRow = sheet.getRow(r);
@@ -83,9 +95,10 @@ export async function POST(request: Request) {
             
             nCell.value = tCell.value;
             
+            // Referans çakışmasını engellemek için tüm alt nesneleri izole ederek kopyalıyoruz
             if (tCell.style) {
-              // Kenarlıkları parça parça ve eksiksiz aktarmak için nesne eşlemesi yapıyoruz
               nCell.style = {
+                ...tCell.style,
                 font: tCell.font ? { ...tCell.font } : undefined,
                 fill: tCell.fill ? { ...tCell.fill } : undefined,
                 alignment: tCell.alignment ? { ...tCell.alignment } : undefined,
@@ -113,24 +126,16 @@ export async function POST(request: Request) {
         });
       }
 
-      // KURAL 1 KORUMASI: Sayfa Sonu Önizleme ve Baskı Alanı Ayarları (İlk sayfa dahil hepsine zorla basıyoruz)
-      sheet.views = [
-        { 
-          state: 'pageBreakPreview', 
-          showGridLines: true
-        }
-      ];
+      // Şablonun orijinal görünüm yapısını bozmadan koru
+      sheet.views = templateSheet.views;
 
-      sheet.pageSetup = {
-        printArea: 'B2:K69',
-        fitToPage: true,
-        fitToWidth: 1,
-        fitToHeight: 1,
-        orientation: templateSheet.pageSetup?.orientation || 'portrait',
-        paperSize: templateSheet.pageSetup?.paperSize || 9
-      };
+      // 4. SABİT HÜCRELERE ÇIKTI TARİHİ VE GÜN BİLGİSİNİ YAZ
+      sheet.getCell('B69').value = cıktiTarihi;
+      sheet.getCell('G69').value = cıktiTarihi;
+      sheet.getCell('K14').value = cıktiTarihi;
+      sheet.getCell('K15').value = cıktiGunAdi;
 
-      // 4. GÜNLÜK İMALAT VERİLERİNİ YAZ
+      // 5. GÜNLÜK İMALAT VERİLERİNİ 49. SATIRDAN İTİBAREN YAZ
       let startRow = 49;
       items.forEach((item, index) => {
         const rowNum = startRow + index;
@@ -147,6 +152,7 @@ export async function POST(request: Request) {
               
               if (baseCell.style) {
                 targetCell.style = {
+                  ...baseCell.style,
                   font: baseCell.font ? { ...baseCell.font } : undefined,
                   fill: baseCell.fill ? { ...baseCell.fill } : undefined,
                   alignment: baseCell.alignment ? { ...baseCell.alignment } : undefined,
@@ -161,7 +167,7 @@ export async function POST(request: Request) {
               }
             }
 
-            // 49. satırdaki merge kurallarını kopyala
+            // 49. satırdaki merge kurallarını alt satırlara kopyala
             templateMerges.forEach((m) => {
               const match = m.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
               if (match) {
@@ -174,15 +180,15 @@ export async function POST(request: Request) {
             });
         }
 
-        // Değer atamaları
+        // Verileri şablon hücrelerine mühürle
         row.getCell(2).value = item.imalat_yeri || '-';
         row.getCell(3).value = item.imalat_adi || '-';
-        row.getCell(10).value = 'EKİNOKS MEKANİK';
+        row.getCell(10).value = 'Ekinoks'; // Sadece "Ekinoks" olarak güncellendi
         row.getCell(11).value = item.calisan_sayisi || 0;
       });
     }
 
-    // 5. DOSYAYI KAYDET VE GÖNDER
+    // 6. DOSYAYI OLUŞTUR VE GÖNDER
     const buffer = await workbook.xlsx.writeBuffer();
     return new Response(buffer, {
       status: 200,
