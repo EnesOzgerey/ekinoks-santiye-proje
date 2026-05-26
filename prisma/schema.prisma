@@ -1,21 +1,49 @@
-model Malzeme {
-  id          String     @id @default(cuid())
-  cins        String     // Malzeme Cinsi
-  marka       String?    // BELGE SAHİBİ KURULUŞUN ADI VE TESCİLLİ TİCARİ MARKASI
-  onayDurumu  String?    @default("Sunuldu") // Sunuldu, Onay Bekliyor, Onaylandı, Reddedildi
-  
-  standartlar Standart[] 
-  
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+generator client {
+  provider = "prisma-client-js"
 }
 
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 1. KADEME: Malzeme Cinsi (Örn: PPR Borular)
+model MalzemeCinsi {
+  id       Int       @id @default(autoincrement())
+  name     String    @unique
+  markalar Marka[]
+}
+
+// 2. KADEME: Markalar ve Onay Durumları (Örn: Fırat Plastik - ONAYLANDI)
+model Marka {
+  id           Int           @id @default(autoincrement())
+  cins_id      Int
+  name         String
+  durum        String        @default("SUNULMADI") // ONAYLANDI, SUNULMADI vb.
+  katalog_url  String?       // Katalog butonu için
+  cins         MalzemeCinsi  @relation(fields: [cins_id], references: [id])
+  standartlar  Standart[]
+}
+
+// 3. KADEME: Belgeler ve Tarihler (Örn: TS EN 1053 - 15.02.2021)
 model Standart {
-  id               String  @id @default(cuid())
-  ad               String  // Standart numarası (Örn: TS EN 10255)
-  belgeNo          String? // Belge No
-  gecerlilikTarihi String? // Son geçerlilik tarihi
-  
-  malzemeId        String
-  malzeme          Malzeme @relation(fields: [malzemeId], references: [id], onDelete: Cascade)
+  id           Int       @id @default(autoincrement())
+  marka_id     Int
+  standart_adi String
+  belge_no     String
+  gecerlilik   String    // 2026-11-10 formatında tutulabilir
+  marka        Marka     @relation(fields: [marka_id], references: [id], onDelete: Cascade)
+}
+
+
+// 6. Günlük Saha İmalatları
+model gunluk_imalat {
+  id                 Int      @id @default(autoincrement())
+  imalat_adi         String
+  tarih              String
+  kullanilan_malzeme String?
+  imalat_yeri        String?
+  metraj             String?
+  calisan_sayisi     Int?     @default(0)
+  photos             String?  // Fotoğraf yollarını JSON array (string) olarak tutuyoruz
 }

@@ -22,48 +22,70 @@ export async function POST(request: Request) {
     await workbook.xlsx.readFile(templatePath);
     const worksheet = workbook.worksheets[0]; 
 
-    // 1. KUSURSUZ GRUPLAMA ALGORİTMASI (YENİ JSON YAPISINA UYARLANDI)
+    // 1. KUSURSUZ HİBRİT GRUPLAMA ALGORİTMASI 
+    // (Hem eski düz JSON'u hem de yeni Prisma iç içe hiyerarşisini anlar)
     const groupedData: any[] = [];
     let totalDataRows = 0;
 
-    materials.forEach((mat: any) => {
-      let cName = (mat.cins_name || '-').trim();
-      cName = cName.replace(/-/g, '\u2011').replace(/ \(/g, '\u00A0('); 
-      
-      const mName = (mat.company_name || '-').trim();
-
-      let cinsGroup = groupedData.find((g: any) => g.cins === cName);
-      if (!cinsGroup) {
-        cinsGroup = { cins: cName, companies: [], totalRows: 0 };
+    materials.forEach((item: any) => {
+      // DURUM A: Yeni Prisma Hiyerarşik Yapısı (cins -> markalar -> standartlar)
+      if (item.markalar && Array.isArray(item.markalar)) {
+        let cName = (item.name || '-').trim();
+        cName = cName.replace(/-/g, '\u2011').replace(/ \(/g, '\u00A0('); 
+        let cinsGroup = { cins: cName, companies: [] as any[], totalRows: 0 };
         groupedData.push(cinsGroup);
-      }
 
-      let companyGroup = cinsGroup.companies.find((c: any) => c.marka === mName);
-      if (!companyGroup) {
-        companyGroup = { marka: mName, certs: [] };
-        cinsGroup.companies.push(companyGroup);
-      }
+        item.markalar.forEach((marka: any) => {
+           let mName = (marka.name || '-').trim();
+           let companyGroup = { marka: mName, certs: [] as any[] };
+           cinsGroup.companies.push(companyGroup);
 
-      // Tek satırdaki JSON verisini diziye çeviriyoruz
-      let certs: any[] = [];
-      try { 
-        certs = JSON.parse(mat.certificates || '[]'); 
-      } catch(e) { certs = [{}]; }
-      
-      // Eğer hiç belge eklenmemişse boş bir satır atsın
-      if (certs.length === 0) certs = [{}];
+           let certs = marka.standartlar || [];
+           if (certs.length === 0) certs = [{}];
 
-      // İçindeki her bir belge/standart için ayrı satır oluşturuyoruz
-      certs.forEach((cert: any) => {
-        companyGroup.certs.push({
-          standart: cert.standart || '-',
-          belge_no: cert.belge_no || '-',
-          expiry_date: cert.expiry_date || '-'
+           certs.forEach((cert: any) => {
+             companyGroup.certs.push({
+               standart: cert.standart_adi || cert.standart || '-',
+               belge_no: cert.belge_no || '-',
+               expiry_date: cert.gecerlilik || cert.expiry_date || '-'
+             });
+             cinsGroup.totalRows += 1; 
+             totalDataRows += 1; 
+           });
         });
+      } 
+      // DURUM B: Eski Düz (Flat) JSON Yapısı
+      else {
+        let cName = (item.cins_name || '-').trim();
+        cName = cName.replace(/-/g, '\u2011').replace(/ \(/g, '\u00A0('); 
+        const mName = (item.company_name || '-').trim();
 
-        cinsGroup.totalRows += 1; 
-        totalDataRows += 1; 
-      });
+        let cinsGroup = groupedData.find((g: any) => g.cins === cName);
+        if (!cinsGroup) {
+          cinsGroup = { cins: cName, companies: [], totalRows: 0 };
+          groupedData.push(cinsGroup);
+        }
+
+        let companyGroup = cinsGroup.companies.find((c: any) => c.marka === mName);
+        if (!companyGroup) {
+          companyGroup = { marka: mName, certs: [] };
+          cinsGroup.companies.push(companyGroup);
+        }
+
+        let certs: any[] = [];
+        try { certs = JSON.parse(item.certificates || '[]'); } catch(e) { certs = [{}]; }
+        if (certs.length === 0) certs = [{}];
+
+        certs.forEach((cert: any) => {
+          companyGroup.certs.push({
+            standart: cert.standart || '-',
+            belge_no: cert.belge_no || '-',
+            expiry_date: cert.expiry_date || '-'
+          });
+          cinsGroup.totalRows += 1; 
+          totalDataRows += 1; 
+        });
+      }
     });
 
     // 2. SATIR ENJEKSİYONU (15'ten İtibaren)
@@ -71,15 +93,24 @@ export async function POST(request: Request) {
       worksheet.spliceRows(15, 0, ...Array(totalDataRows).fill([]));
     }
 
-    // 3. SİHİRLİ SİLİCİ (Hayalet Birleştirmeleri Temizleme)
+    // 3. GELİŞTİRİLMİŞ SİHİRLİ SİLİCİ (Sorunu çözen yer burası)
+    // Şablon aşağı itilirken uzayan ve yeni verilerimizle çarpışan tüm "Hayalet Birleştirmeleri" yok eder.
     if ((worksheet as any)._merges) {
       const cleanMerges: any = {};
       for (const key in (worksheet as any)._merges) {
         const m = (worksheet as any)._merges[key];
-        if (m.top >= 15 && m.bottom <= 15 + totalDataRows - 1) {
-          continue; 
+        
+        // 15'ten önceki üst başlık (Header) birleştirmeleri KORUNUR
+        const isHeader = m.bottom < 15;
+        
+        // Orijinalde 17'den başlayan alt kısım (Footer) birleştirmeleri KORUNUR
+        // (totalDataRows kadar aşağı itildikleri için yeni konumları 17 + totalDataRows oldu)
+        const isFooter = m.top >= 17 + totalDataRows;
+
+        // Header veya Footer değilse, bu bir hayalet veridir; SİL!
+        if (isHeader || isFooter) {
+          cleanMerges[key] = m;
         }
-        cleanMerges[key] = m;
       }
       (worksheet as any)._merges = cleanMerges;
     }
@@ -223,10 +254,9 @@ export async function POST(request: Request) {
       });
     });
 
-    // 9. 🎨 ALT ŞABLON KENARLIK RESTORASYONU (Tüm Nokta Atışı Kurallar)
+    // 9. 🎨 ALT ŞABLON KENARLIK RESTORASYONU
     const offset = totalDataRows;
     
-    // 9.1. Dinamik Üretilen Veri Tablosu Satırlarının Dış Kenarları
     worksheet.eachRow((row, rowNumber) => {
       if (rowNumber >= 15 && rowNumber < 15 + offset) {
         const cellC = row.getCell('C');
@@ -237,7 +267,6 @@ export async function POST(request: Request) {
       }
     });
 
-    // 9.2. Alt İmza/Not Alanı (Footer) ve Ekstra Temizlik Bölgesi
     const maxRowLimit = 50 + offset; 
     
     for (let r = 15 + offset; r <= maxRowLimit; r++) {
@@ -359,9 +388,7 @@ export async function POST(request: Request) {
         }
       }
 
-      // --- KURAL: Footerin 10. satırı (Orijinal 25) ---
       if (originalRow === 25) {
-        // C sütununun üstünde kenarlık çıkmaması için bir üst satırın (24) alt kenarlığını garanti siliyoruz
         const prevC = worksheet.getRow(r - 1).getCell('C');
         if (prevC.border) {
           const prevBorder = { ...prevC.border };
@@ -369,45 +396,17 @@ export async function POST(request: Request) {
           prevC.border = prevBorder;
         }
 
-        // B Sütunu Sağ Kalın Kenarlık
         bCell.border = { ...(bCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
 
-        // C ve D arası normal (thin)
-        cCell.border = {
-          left: { style: 'medium', color: { argb: 'FF000000' } },
-          right: { style: 'thin', color: { argb: 'FF000000' } }, // Sağ ince
-          bottom: { style: 'thin', color: { argb: 'FF000000' } }
-        };
-        dCell.border = {
-          left: { style: 'thin', color: { argb: 'FF000000' } }, // Sol ince
-          right: { style: 'thin', color: { argb: 'FF000000' } },
-          bottom: { style: 'thin', color: { argb: 'FF000000' } }
-        };
-
-        // E ve F arası normal (thin), F'nin sağı kalın (medium)
-        eCell.border = {
-          left: { style: 'thin', color: { argb: 'FF000000' } },
-          right: { style: 'thin', color: { argb: 'FF000000' } }, // Sağ ince
-          bottom: { style: 'thin', color: { argb: 'FF000000' } }
-        };
-        fCell.border = {
-          left: { style: 'thin', color: { argb: 'FF000000' } },  // Sol ince
-          right: { style: 'medium', color: { argb: 'FF000000' } }, // F'NİN SAĞI KALIN
-          bottom: { style: 'thin', color: { argb: 'FF000000' } }
-        };
-        
+        cCell.border = { left: { style: 'medium', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
+        dCell.border = { left: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
+        eCell.border = { left: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
+        fCell.border = { left: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'medium', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
         hCell.border = { ...(hCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
       }
 
-      // --- KURAL: Footerin 11. satırı (Orijinal 26) ---
       if (originalRow === 26) {
-        fCell.border = {
-          right: { style: 'medium', color: { argb: 'FF000000' } },
-          bottom: { style: 'medium', color: { argb: 'FF000000' } },
-          left: { style: 'thin', color: { argb: 'FF000000' } },
-          top: { style: 'thin', color: { argb: 'FF000000' } }
-        };
-
+        fCell.border = { right: { style: 'medium', color: { argb: 'FF000000' } }, bottom: { style: 'medium', color: { argb: 'FF000000' } }, left: { style: 'thin', color: { argb: 'FF000000' } }, top: { style: 'thin', color: { argb: 'FF000000' } } };
         cCell.border = { ...(cCell.border || {}), left: { style: 'medium', color: { argb: 'FF000000' } } };
         hCell.border = { ...(hCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
       }

@@ -2,44 +2,146 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import fs from 'fs';
+import path from 'path';
 
-export async function kaydetMalzeme(formData: FormData) {
-  const idStr = formData.get("id") as string | null;
-  const cins = formData.get("cins") as string;
-  const standart = formData.get("standart") as string;
-  const birim = formData.get("birim") as string;
+// Yardımcı Fonksiyon: Dosyayı fiziksel olarak sunucuya kaydeder
+async function saveKatalogDosyasi(katalogDosya: File | null): Promise<string | null> {
+  if (!katalogDosya || katalogDosya.size === 0) return null;
 
-  if (!cins || !standart || !birim) {
-    throw new Error("Lütfen tüm zorunlu alanları doldurun.");
+  const bytes = await katalogDosya.arrayBuffer();
+  const buffer = Buffer.from(bytes);
+  
+  const uploadDir = path.join(process.cwd(), 'public', 'kataloglar');
+  if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
   }
+  
+  // Dosya adındaki boşlukları temizleyip benzersiz bir ID ekliyoruz
+  const safeName = katalogDosya.name.replace(/\s+/g, '_');
+  const filename = `${Date.now()}_--${safeName}`;
+  const filePath = path.join(uploadDir, filename);
+  
+  await fs.promises.writeFile(filePath, buffer);
+  return `/kataloglar/${filename}`;
+}
 
-  if (idStr) {
-    const id = parseInt(idStr, 10);
-    await prisma.malzeme.update({
-      where: { id },
-      data: { cins, standart, birim },
-    });
-  } else {
-    await prisma.malzeme.create({
-      data: { cins, standart, birim },
-    });
+export async function yeniMalzemeEkle(formData: FormData) {
+  const cinsName = (formData.get("cinsName") as string).trim();
+  const markaName = (formData.get("markaName") as string).trim();
+  const durum = (formData.get("durum") as string) || "SUNULDU";
+  
+  const katalogDosya = formData.get("katalogDosya") as File | null;
+  const katalogPath = await saveKatalogDosyasi(katalogDosya); // Dosyayı kaydet ve yolunu al
+  
+  const standartlarJSON = formData.get("standartlarJSON") as string;
+  const standartlar = JSON.parse(standartlarJSON);
+
+  if (!cinsName || !markaName) throw new Error("Lütfen Kategori ve Marka alanlarını doldurun.");
+
+  const cins = await prisma.malzemeCinsi.upsert({
+    where: { name: cinsName },
+    update: {},
+    create: { name: cinsName },
+  });
+
+  const marka = await prisma.marka.create({
+    data: {
+      cins_id: cins.id,
+      name: markaName,
+      durum: durum,
+      katalog_url: katalogPath, // DB'ye artık fiziksel yolu yazıyoruz
+    }
+  });
+
+  const gecerliStandartlar = standartlar.filter((s: any) => s.standartAdi.trim() !== "");
+  if (gecerliStandartlar.length > 0) {
+    await Promise.all(
+      gecerliStandartlar.map((std: any) =>
+        prisma.standart.create({
+          data: {
+            marka_id: marka.id,
+            standart_adi: std.standartAdi.trim(),
+            belge_no: std.belgeNo.trim(),
+            gecerlilik: std.gecerlilik.trim(),
+          }
+        })
+      )
+    );
   }
 
   revalidatePath("/malzeme-tipleri");
 }
 
-export async function silMalzeme(formData: FormData) {
-  const idStr = formData.get("id") as string | null;
+export async function guncelleMarka(formData: FormData) {
+  const markaId = parseInt(formData.get("markaId") as string, 10);
+  const markaName = (formData.get("markaName") as string).trim();
+  const durum = (formData.get("durum") as string) || "SUNULDU";
+  
+  const katalogDosya = formData.get("katalogDosya") as File | null;
+  const katalogPath = await saveKatalogDosyasi(katalogDosya); // Yeni dosya yüklendiyse kaydet
+  
+  const standartlarJSON = formData.get("standartlarJSON") as string;
+  const standartlar = JSON.parse(standartlarJSON);
 
-  if (!idStr) {
-    throw new Error("Silinecek kayda ait ID bulunamadı.");
+  if (!markaId || !markaName) throw new Error("Eksik veri.");
+
+  const updateData: any = { name: markaName, durum: durum };
+  // Sadece yeni dosya yüklendiyse katalog_url'yi güncelle, yoksa eskisini koru
+  if (katalogPath) updateData.katalog_url = katalogPath;
+
+  await prisma.marka.update({ where: { id: markaId }, data: updateData });
+  await prisma.standart.deleteMany({ where: { marka_id: markaId } });
+
+  const gecerliStandartlar = standartlar.filter((s: any) => s.standartAdi.trim() !== "");
+  if (gecerliStandartlar.length > 0) {
+    await Promise.all(
+      gecerliStandartlar.map((std: any) =>
+        prisma.standart.create({
+          data: {
+            marka_id: markaId,
+            standart_adi: std.standartAdi.trim(),
+            belge_no: std.belgeNo.trim(),
+            gecerlilik: std.gecerlilik.trim(),
+          }
+        })
+      )
+    );
   }
 
+  revalidatePath("/malzeme-tipleri");
+}
+
+export async function guncelleMalzemeCinsi(id: number, newName: string) {
+  if (!newName.trim()) throw new Error("Kategori adı boş olamaz.");
+  await prisma.malzemeCinsi.update({
+    where: { id },
+    data: { name: newName.trim() }
+  });
+  revalidatePath("/malzeme-tipleri");
+}
+
+export async function silMarka(formData: FormData) {
+  // Gelen form verisinden 'id' değerini alıp sayıya (integer) çeviriyoruz
+  const idStr = formData.get("id") as string;
+  if (!idStr) return;
+  
   const id = parseInt(idStr, 10);
 
-  await prisma.malzeme.delete({
-    where: { id },
-  });
-
+  const marka = await prisma.marka.findUnique({ where: { id } });
+  
+  if (marka) {
+    await prisma.marka.delete({ where: { id } });
+    
+    // Eğer markayı sildikten sonra bağlı olduğu kategori (cins) boş kalırsa onu da temizle
+    const kalanMarkalar = await prisma.marka.count({ where: { cins_id: marka.cins_id } });
+    if (kalanMarkalar === 0) {
+      await prisma.malzemeCinsi.delete({ where: { id: marka.cins_id } });
+    }
+  }
+  revalidatePath("/malzeme-tipleri");
+}
+export async function silStandart(id: number) {
+  await prisma.standart.delete({ where: { id } });
   revalidatePath("/malzeme-tipleri");
 }

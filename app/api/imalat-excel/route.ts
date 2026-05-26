@@ -41,6 +41,7 @@ export async function POST(request: Request) {
     imalatlar.forEach((item: any) => {
       let dateKey = 'Tarihsiz';
       if (item.tarih) {
+        // YYYY-MM-DD formatını DD.MM.YYYY'ye çeviriyoruz
         const parts = item.tarih.split('-');
         if (parts.length === 3) dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`;
       }
@@ -64,6 +65,7 @@ export async function POST(request: Request) {
       const items = groupedData[date];
       let sheet;
 
+      // İlk gün için mevcut şablon sayfasını kullan, sonraki her gün için yeni sekme klonla
       if (i === 0) {
         sheet = templateSheet;
         sheet.name = date;
@@ -81,7 +83,7 @@ export async function POST(request: Request) {
           if (tCol.hidden) nCol.hidden = tCol.hidden;
         }
 
-        // BAĞIMSIZ STİL KOPYALAMA DÖNGÜSÜ (Borders Çakışmasını Önler)
+        // BAĞIMSIZ STİL KOPYALAMA DÖNGÜSÜ (Borders/Hücre Çakışmasını Önler)
         for (let r = 1; r <= maxRows; r++) {
           const tRow = templateSheet.getRow(r);
           const nRow = sheet.getRow(r);
@@ -126,7 +128,7 @@ export async function POST(request: Request) {
         });
       }
 
-      // Şablonun orijinal görünüm yapısını bozmadan koru
+      // Şablonun orijinal görünüm yapısını dondur
       sheet.views = templateSheet.views;
 
       // 4. SABİT HÜCRELERE ÇIKTI TARİHİ VE GÜN BİLGİSİNİ YAZ
@@ -167,7 +169,7 @@ export async function POST(request: Request) {
               }
             }
 
-            // 49. satırdaki merge kurallarını alt satırlara kopyala
+            // 49. satırdaki merge (hücre birleştirme) kurallarını alt satırlara çoğalt
             templateMerges.forEach((m) => {
               const match = m.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
               if (match) {
@@ -180,15 +182,15 @@ export async function POST(request: Request) {
             });
         }
 
-        // Verileri şablon hücrelerine mühürle
+        // Verileri şablon hücrelerine mühürle (Malzeme ve metraj iptal edildi, sadece imalat_adi)
         row.getCell(2).value = item.imalat_yeri || '-';
         row.getCell(3).value = item.imalat_adi || '-';
-        row.getCell(10).value = 'Ekinoks'; // Sadece "Ekinoks" olarak güncellendi
+        row.getCell(10).value = 'Ekinoks';
         row.getCell(11).value = item.calisan_sayisi || 0;
       });
     }
 
-    // 6. DOSYAYI OLUŞTUR VE GÖNDER
+    // 6. DOSYAYI OLUŞTUR VE TARAYICIYA GÖNDER
     const buffer = await workbook.xlsx.writeBuffer();
     return new Response(buffer, {
       status: 200,

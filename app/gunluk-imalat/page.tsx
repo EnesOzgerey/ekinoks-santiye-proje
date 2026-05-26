@@ -1,12 +1,31 @@
-import db from '@/lib/db';
+// app/gunluk-imalat/page.tsx
+import { prisma } from '@/lib/prisma';
 import ImalatClient from './imalat-client';
 
-// Bu sayfanın her zaman en güncel veriyi çekmesini garanti edelim
 export const dynamic = 'force-dynamic';
 
-export default function GunlukImalatPage() {
-  // Kayıtları en yeniden en eskiye (ID DESC) göre çekiyoruz
-  const imalatlar = db.prepare('SELECT * FROM gunluk_imalat ORDER BY id DESC').all();
+export default async function GunlukImalatPage() {
+  // İmalat geçmişini çekiyoruz
+  const imalatlar = await prisma.gunluk_imalat.findMany({
+    orderBy: { id: 'desc' }
+  });
 
-  return <ImalatClient imalatlar={imalatlar} />;
+  // 1. Sadece Malzeme Cinslerini (Kategorileri) ve altındaki markaları çek
+  const cinsler = await prisma.malzemeCinsi.findMany({
+    include: { markalar: true }
+  });
+
+  // 2. İstemciye (Client) sadece "Malzeme Adı" ve "Genel Onay Durumu" gönder
+  const kayitliMalzemeler = cinsler.map(cins => {
+    // Eğer bu cinse ait en az 1 tane bile 'ONAYLANDI' durumunda marka varsa,
+    // sahada bu malzemenin kullanılmasına izin verilir.
+    const isApproved = cins.markalar.some(m => m.durum === 'ONAYLANDI');
+    
+    return {
+      ad: cins.name, // Artık markayı eklemiyoruz, sadece Cins adını gönderiyoruz
+      durum: isApproved ? 'ONAYLANDI' : 'ONAY BEKLİYOR'
+    };
+  });
+
+  return <ImalatClient imalatlar={imalatlar} kayitliMalzemeler={kayitliMalzemeler} />;
 }
