@@ -1,25 +1,26 @@
 'use server';
 
-import db from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 import { revalidatePath } from 'next/cache';
 import fs from 'fs';
 import path from 'path';
 
 export async function kaydetImalat(formData: FormData) {
-  const id = formData.get('id') as string; // Düzenleme modu için ID
+  const idStr = formData.get('id') as string | null;
   const imalat_adi = formData.get('imalat_adi') as string;
-  const tarih = formData.get('tarih') as string; // YENİ: Tarih
+  const tarih = formData.get('tarih') as string;
   const kullanilan_malzeme = formData.get('kullanilan_malzeme') as string;
   const imalat_yeri = formData.get('imalat_yeri') as string;
   const metraj = formData.get('metraj') as string;
   const calisan_sayisi = parseInt(formData.get('calisan_sayisi') as string) || 0;
   
-  const existing_photos = formData.getAll('existing_photos') as string[]; // Düzenlerken silinmeyen eski fotoğraflar
+  const existing_photos = formData.getAll('existing_photos') as string[];
   const photos = formData.getAll('photos') as File[];
   const photoPaths: string[] = [];
 
   if (!imalat_adi) throw new Error('İmalat (İş Kalemi) adı zorunludur!');
 
+  // Klasör kontrolü
   const uploadDir = path.join(process.cwd(), 'public', 'imalat_photos');
   if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -37,32 +38,53 @@ export async function kaydetImalat(formData: FormData) {
     }
   }
 
-  // Eski ve yeni fotoğrafları birleştir
+  // Eski ve yeni fotoğrafları birleştirip JSON string'e çeviriyoruz
   const finalPhotos = [...existing_photos, ...photoPaths];
+  const photosJSON = JSON.stringify(finalPhotos);
 
-  if (id) {
-    // GÜNCELLEME İŞLEMİ (UPDATE)
-    const update = db.prepare(`
-      UPDATE gunluk_imalat 
-      SET imalat_adi = ?, tarih = ?, kullanilan_malzeme = ?, imalat_yeri = ?, metraj = ?, calisan_sayisi = ?, photos = ?
-      WHERE id = ?
-    `);
-    update.run(imalat_adi, tarih, kullanilan_malzeme, imalat_yeri, metraj, calisan_sayisi, JSON.stringify(finalPhotos), id);
+  if (idStr) {
+    // DÜZENLEME (UPDATE) MANTIĞI - PRISMA
+    const id = parseInt(idStr, 10);
+    await prisma.gunluk_imalat.update({
+      where: { id },
+      data: {
+        imalat_adi,
+        tarih,
+        kullanilan_malzeme,
+        imalat_yeri,
+        metraj,
+        calisan_sayisi,
+        photos: photosJSON
+      }
+    });
   } else {
-    // YENİ KAYIT İŞLEMİ (INSERT)
-    const insert = db.prepare(`
-      INSERT INTO gunluk_imalat (imalat_adi, tarih, kullanilan_malzeme, imalat_yeri, metraj, calisan_sayisi, photos)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `);
-    insert.run(imalat_adi, tarih, kullanilan_malzeme, imalat_yeri, metraj, calisan_sayisi, JSON.stringify(finalPhotos));
+    // YENİ KAYIT (INSERT) MANTIĞI - PRISMA
+    await prisma.gunluk_imalat.create({
+      data: {
+        imalat_adi,
+        tarih,
+        kullanilan_malzeme,
+        imalat_yeri,
+        metraj,
+        calisan_sayisi,
+        photos: photosJSON
+      }
+    });
   }
   
   revalidatePath('/gunluk-imalat');
 }
 
 export async function silImalat(formData: FormData) {
-  const id = formData.get('id') as string;
-  if (!id) return;
-  db.prepare('DELETE FROM gunluk_imalat WHERE id = ?').run(id);
+  const idStr = formData.get('id') as string | null;
+  if (!idStr) return;
+  
+  const id = parseInt(idStr, 10);
+  
+  // SİLME İŞLEMİ - PRISMA
+  await prisma.gunluk_imalat.delete({
+    where: { id }
+  });
+  
   revalidatePath('/gunluk-imalat');
 }

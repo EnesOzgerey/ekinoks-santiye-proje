@@ -1,10 +1,12 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { kaydetImalat, silImalat } from './actions';
 import MultiDatePicker from '../components/MultiDatePicker';
 
 export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { imalatlar: any[], kayitliMalzemeler: any[] }) {
+  const router = useRouter(); 
   const [loading, setLoading] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
 
@@ -22,7 +24,8 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
 
   const today = new Date().toISOString().split('T')[0];
 
-  const emptyMalzeme = { ad: '', metraj: '' };
+  // YENİ: Metraj yerine ayrı miktar (sayısal) ve birim alanları eklendi
+  const emptyMalzeme = { ad: '', miktar: '', birim: 'adet', metraj: '' };
   
   const [formState, setFormState] = useState<{
     imalat_adi: string; tarih: string; imalat_yeri: string; calisan_sayisi: number; malzemeler: typeof emptyMalzeme[]; photos: File[]; existing_photos: string[];
@@ -82,9 +85,14 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
     let parsedMalzemeler = [];
     try {
       const parsed = JSON.parse(item.kullanilan_malzeme);
-      parsedMalzemeler = Array.isArray(parsed) ? parsed : [{ ad: item.kullanilan_malzeme || '', metraj: item.metraj || '' }];
+      parsedMalzemeler = Array.isArray(parsed) ? parsed.map(m => ({
+        ad: m.ad || '',
+        miktar: m.miktar || '', 
+        birim: m.birim || 'adet',
+        metraj: m.metraj || '' // Eski kayıtlar için geriye dönük uyumluluk
+      })) : [{ ad: item.kullanilan_malzeme || '', miktar: '', birim: 'adet', metraj: item.metraj || '' }];
     } catch {
-      parsedMalzemeler = [{ ad: item.kullanilan_malzeme || '', metraj: item.metraj || '' }];
+      parsedMalzemeler = [{ ad: item.kullanilan_malzeme || '', miktar: '', birim: 'adet', metraj: item.metraj || '' }];
     }
     if (parsedMalzemeler.length === 0) parsedMalzemeler = [{ ...emptyMalzeme }];
 
@@ -128,6 +136,8 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
       data.append('tarih', formState.tarih);
       data.append('imalat_yeri', formState.imalat_yeri);
       data.append('calisan_sayisi', formState.calisan_sayisi.toString());
+      
+      // Miktar ve Birim JSON ile doğrudan DB'ye aktarılıyor
       data.append('kullanilan_malzeme', JSON.stringify(validMalzemeler));
       data.append('metraj', ''); 
       
@@ -136,8 +146,25 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
 
       await kaydetImalat(data);
       handleCancel();
+      router.refresh(); 
+      
     } catch (error: any) { alert('Kayıt Hatası: ' + error.message); } 
     finally { setLoading(false); }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Bu imalatı silmek istediğinize emin misiniz?')) return;
+    setLoading(true);
+    try {
+      const data = new FormData();
+      data.append('id', id.toString());
+      await silImalat(data);
+      router.refresh(); 
+    } catch (error: any) {
+      alert('Silme Hatası: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openLightbox = (photos: string[], index: number) => { setActivePhotos(photos); setViewerIndex(index); };
@@ -145,7 +172,6 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
   const prevPhoto = (e: React.MouseEvent) => { e.stopPropagation(); if (activePhotos && viewerIndex !== null) setViewerIndex((prev) => (prev! > 0 ? prev! - 1 : activePhotos.length - 1)); };
   const closeViewer = (e: React.MouseEvent) => { e.stopPropagation(); setActivePhotos(null); setViewerIndex(null); };
 
-  // DÜZENLEME SATIRLARI
   const renderInputRows = (isNew: boolean) => {
     return formState.malzemeler.map((malz, index) => {
       
@@ -200,10 +226,34 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
             )}
           </td>
 
+          {/* YENİ: MİKTAR VE BİRİM KUTUCUKLARI (DEPOCU FORMATI) */}
           <td className="p-3 align-middle text-center border-r border-zinc-800/30">
-            <div className="flex justify-center items-center gap-2">
-              <input type="text" placeholder="Adet / Metraj" value={malz.metraj} onChange={e => handleMalzemeChange(index, 'metraj', e.target.value)} className="w-24 bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"/>
-              <div className="flex items-center gap-1">
+            <div className="flex justify-center items-center gap-1.5">
+              <input 
+                type="number" 
+                step="any"
+                placeholder="Miktar" 
+                value={malz.miktar} 
+                onChange={e => handleMalzemeChange(index, 'miktar', e.target.value)} 
+                className="w-[70px] bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"
+              />
+              <select 
+                value={malz.birim} 
+                onChange={e => handleMalzemeChange(index, 'birim', e.target.value)} 
+                className="w-[65px] bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-zinc-300 outline-none text-center cursor-pointer"
+              >
+                <option value="adet">adet</option>
+                <option value="m">m</option>
+                <option value="m2">m²</option>
+                <option value="m3">m³</option>
+                <option value="kg">kg</option>
+                <option value="ton">ton</option>
+                <option value="lt">lt</option>
+                <option value="cm">cm</option>
+                <option value="set">set</option>
+              </select>
+
+              <div className="flex items-center gap-1 ml-1">
                 {formState.malzemeler.length > 1 && <button onClick={() => removeMalzeme(index)} type="button" className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors">🗑️</button>}
                 {index === formState.malzemeler.length - 1 && <button onClick={addMalzeme} type="button" className="p-1.5 text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 rounded transition-colors">➕</button>}
               </div>
@@ -261,7 +311,6 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
   return (
     <div className="max-w-[1500px] mx-auto p-6 bg-zinc-950 min-h-screen text-zinc-100 print:bg-white print:text-black print:p-0">
       
-      {/* ÜST BAR VE TOOLBAR */}
       <div className="mb-6 flex flex-col gap-4 print:hidden">
         <h1 className="text-xl font-bold tracking-tight">Günlük Saha İmalat Paneli</h1>
         <div className="flex flex-wrap items-center gap-3 bg-zinc-900/40 p-2 rounded-lg border border-zinc-800/60 w-fit shadow-sm relative z-40">
@@ -292,18 +341,17 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
         </div>
       </div>
 
-      {/* ANA TABLO */}
       <div className="bg-[#0f0f11] border border-zinc-800 rounded-xl overflow-visible shadow-2xl print:border-0 print:shadow-none">
         <table className="w-full text-left text-xs border-collapse min-w-[1000px] print:text-black">
           <thead>
             <tr className="bg-zinc-950 text-zinc-500 font-bold uppercase tracking-wider border-b border-zinc-800 print:bg-transparent print:border-black print:text-black">
               <th className="p-3 w-[20%] text-center">İMALAT ADI & TARİH</th>
               <th className="p-3 w-[25%] text-center">KULLANILAN MALZEME</th>
-              <th className="p-3 w-[12%] text-center">METRAJ</th>
+              <th className="p-3 w-[15%] text-center">MİKTAR</th>
               <th className="p-3 w-[15%] text-center">YER / LOKASYON</th>
               <th className="p-3 w-[5%] text-center">EKİP</th>
-              <th className="p-3 w-[13%] text-center print:hidden">FOTOĞRAFLAR</th>
-              <th className="p-3 w-[10%] text-center print:hidden">İŞLEMLER</th>
+              <th className="p-3 w-[12%] text-center print:hidden">FOTOĞRAFLAR</th>
+              <th className="p-3 w-[8%] text-center print:hidden">İŞLEMLER</th>
             </tr>
           </thead>
           <tbody onMouseLeave={() => setHoveredRow(null)}>
@@ -316,9 +364,9 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
               let parsedMalzemeler = [];
               try {
                 const parsed = JSON.parse(item.kullanilan_malzeme);
-                parsedMalzemeler = Array.isArray(parsed) ? parsed : [{ ad: item.kullanilan_malzeme || '', metraj: item.metraj || '' }];
+                parsedMalzemeler = Array.isArray(parsed) ? parsed : [{ ad: item.kullanilan_malzeme || '', miktar: '', birim: 'adet', metraj: item.metraj || '' }];
               } catch {
-                parsedMalzemeler = [{ ad: item.kullanilan_malzeme || '', metraj: item.metraj || '' }];
+                parsedMalzemeler = [{ ad: item.kullanilan_malzeme || '', miktar: '', birim: 'adet', metraj: item.metraj || '' }];
               }
               if (parsedMalzemeler.length === 0) parsedMalzemeler = [{ ...emptyMalzeme }];
 
@@ -350,7 +398,8 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
                   </td>
                   
                   <td className="p-3 align-middle text-center text-zinc-300 font-mono font-bold border-r border-zinc-800/30">
-                    {malz.metraj || '-'}
+                    {/* YENİ: Miktar varsa onu yazdır, yoksa eski metrajı yazdır (geri uyumluluk) */}
+                    {malz.miktar ? `${malz.miktar} ${malz.birim}` : (malz.metraj || '-')}
                   </td>
                   
                   {sIndex === 0 && (
@@ -382,10 +431,7 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
                       <td className="p-3 align-middle text-center print:hidden" rowSpan={parsedMalzemeler.length}>
                         <div className="flex flex-row justify-center items-center gap-2">
                           <button onClick={() => openEditMode(item)} className="text-zinc-400 hover:text-blue-400 bg-zinc-900 hover:bg-blue-500/10 px-2.5 py-1.5 rounded transition-colors" title="Düzenle">✏️</button>
-                          <form action={silImalat}>
-                            <input type="hidden" name="id" value={item.id} />
-                            <button type="submit" onClick={(e) => { if(!confirm('Emin misiniz?')) e.preventDefault() }} className="text-zinc-400 hover:text-red-400 bg-zinc-900 hover:bg-red-500/10 px-2.5 py-1.5 rounded transition-colors" title="Sil">🗑️</button>
-                          </form>
+                          <button onClick={() => handleDelete(item.id)} disabled={loading} className="text-zinc-400 hover:text-red-400 bg-zinc-900 hover:bg-red-500/10 px-2.5 py-1.5 rounded transition-colors" title="Sil">🗑️</button>
                         </div>
                       </td>
                     </>

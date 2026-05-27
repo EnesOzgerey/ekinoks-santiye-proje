@@ -47,3 +47,4 @@ model gunluk_imalat {
   calisan_sayisi     Int?     @default(0)
   photos             String?  // Fotoğraf yollarını JSON array (string) olarak tutuyoruz
 }
+

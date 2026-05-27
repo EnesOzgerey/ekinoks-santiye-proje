@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     const gun = String(bugun.getDate()).padStart(2, '0');
     const ay = String(bugun.getMonth() + 1).padStart(2, '0');
     const yil = bugun.getFullYear();
-    const cıktiTarihi = `${gun}.${ay}.${yil}`; // DD.MM.YYYY formatı
+    const cıktiTarihi = `${gun}.${ay}.${yil}`; 
 
     const gunler = ['Pazar', 'Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi'];
     const cıktiGunAdi = gunler[bugun.getDay()];
@@ -41,7 +41,6 @@ export async function POST(request: Request) {
     imalatlar.forEach((item: any) => {
       let dateKey = 'Tarihsiz';
       if (item.tarih) {
-        // YYYY-MM-DD formatını DD.MM.YYYY'ye çeviriyoruz
         const parts = item.tarih.split('-');
         if (parts.length === 3) dateKey = `${parts[2]}.${parts[1]}.${parts[0]}`;
       }
@@ -52,30 +51,24 @@ export async function POST(request: Request) {
     });
 
     const sortedDates = Object.keys(groupedData).sort();
-
-    // Şablonun sınırlarını ve özelliklerini hafızaya al
     const templateMerges = templateSheet.model ? [...(templateSheet.model.merges || [])] : [];
     const templateImages = templateSheet.getImages() || [];
     const maxRows = Math.max(templateSheet.rowCount, 120); 
     const maxCols = Math.max(templateSheet.columnCount, 20);
 
-    // 3. GÜNLERİ VEYA SAYFALARI İŞLE
     for (let i = 0; i < sortedDates.length; i++) {
       const date = sortedDates[i];
       const items = groupedData[date];
       let sheet;
 
-      // İlk gün için mevcut şablon sayfasını kullan, sonraki her gün için yeni sekme klonla
       if (i === 0) {
         sheet = templateSheet;
         sheet.name = date;
       } else {
         sheet = workbook.addWorksheet(date);
-        
         sheet.properties = templateSheet.properties;
         sheet.pageSetup = templateSheet.pageSetup;
         
-        // Sütun genişliklerini aktar
         for (let c = 1; c <= maxCols; c++) {
           const tCol = templateSheet.getColumn(c);
           const nCol = sheet.getColumn(c);
@@ -83,7 +76,6 @@ export async function POST(request: Request) {
           if (tCol.hidden) nCol.hidden = tCol.hidden;
         }
 
-        // BAĞIMSIZ STİL KOPYALAMA DÖNGÜSÜ (Borders/Hücre Çakışmasını Önler)
         for (let r = 1; r <= maxRows; r++) {
           const tRow = templateSheet.getRow(r);
           const nRow = sheet.getRow(r);
@@ -94,10 +86,7 @@ export async function POST(request: Request) {
           for (let c = 1; c <= maxCols; c++) {
             const tCell = tRow.getCell(c);
             const nCell = nRow.getCell(c);
-            
             nCell.value = tCell.value;
-            
-            // Referans çakışmasını engellemek için tüm alt nesneleri izole ederek kopyalıyoruz
             if (tCell.style) {
               nCell.style = {
                 ...tCell.style,
@@ -117,33 +106,22 @@ export async function POST(request: Request) {
           }
         }
 
-        // Hücre birleştirmelerini aktar
-        templateMerges.forEach((m: string) => {
-          try { sheet.mergeCells(m); } catch (e) {}
-        });
-
-        // Görselleri aktar
-        templateImages.forEach((img) => {
-          try { sheet.addImage(Number(img.imageId), img.range); } catch (e) {}
-        });
+        templateMerges.forEach((m: string) => { try { sheet.mergeCells(m); } catch (e) {} });
+        templateImages.forEach((img) => { try { sheet.addImage(Number(img.imageId), img.range); } catch (e) {} });
       }
 
-      // Şablonun orijinal görünüm yapısını dondur
       sheet.views = templateSheet.views;
 
-      // 4. SABİT HÜCRELERE ÇIKTI TARİHİ VE GÜN BİLGİSİNİ YAZ
       sheet.getCell('B69').value = cıktiTarihi;
       sheet.getCell('G69').value = cıktiTarihi;
       sheet.getCell('K14').value = cıktiTarihi;
       sheet.getCell('K15').value = cıktiGunAdi;
 
-      // 5. GÜNLÜK İMALAT VERİLERİNİ 49. SATIRDAN İTİBAREN YAZ
       let startRow = 49;
       items.forEach((item, index) => {
         const rowNum = startRow + index;
         const row = sheet.getRow(rowNum);
         
-        // Çoklu iş kalemlerinde 49. satırın stilini/kenarlıklarını aşağıya tam klonla
         if (index > 0) {
             const baseRow = sheet.getRow(startRow);
             row.height = baseRow.height;
@@ -169,7 +147,6 @@ export async function POST(request: Request) {
               }
             }
 
-            // 49. satırdaki merge (hücre birleştirme) kurallarını alt satırlara çoğalt
             templateMerges.forEach((m) => {
               const match = m.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
               if (match) {
@@ -182,7 +159,6 @@ export async function POST(request: Request) {
             });
         }
 
-        // Verileri şablon hücrelerine mühürle (Malzeme ve metraj iptal edildi, sadece imalat_adi)
         row.getCell(2).value = item.imalat_yeri || '-';
         row.getCell(3).value = item.imalat_adi || '-';
         row.getCell(10).value = 'Ekinoks';
@@ -190,7 +166,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // 6. DOSYAYI OLUŞTUR VE TARAYICIYA GÖNDER
     const buffer = await workbook.xlsx.writeBuffer();
     return new Response(buffer, {
       status: 200,
