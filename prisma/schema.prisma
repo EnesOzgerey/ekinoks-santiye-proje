@@ -42,11 +42,12 @@ model gunluk_imalat {
   id                 Int      @id @default(autoincrement())
   imalat_adi         String
   tarih              String
-  kullanilan_malzeme String?
-  imalat_yeri        String?
+  imalat_yeri        String
+  calisan_sayisi     Int
+  kullanilan_malzeme String
   metraj             String?
-  calisan_sayisi     Int?     @default(0)
-  photos             String?  // Fotoğraf yollarını JSON array (string) olarak tutuyoruz
+  photos             String?
+  plan_id            Int?     // YENİ EKLENDİ: Planlı işlerle bağlantı kurmak için
 }
 
 model DepoMalzeme {
@@ -80,14 +81,16 @@ model AdamSaatVerisi {
 
 
 model PlanlamaAyarlari {
-  id                 Int   @id @default(1)
-  haftalik_mesai_gun Int   @default(6)
-  gunluk_mesai_saat  Float @default(9.0)
+  id                 Int    @id @default(1)
+  haftalik_mesai_gun Int    @default(6)
+  gunluk_mesai_saat  Float  @default(9.0)
+  tatil_gunleri      String @default("[]") // YENİ: Bayram ve Özel Tatiller (JSON Formatında)
 }
 
 model ImalatPlani {
   id                 Int      @id @default(autoincrement())
   is_adi             String
+  is_konumu          String   @default("") // HATA BURADAYDI, DÜZELTİLDİ
   malzeme_adi        String
   cap                String
   miktar             Float
@@ -99,7 +102,6 @@ model ImalatPlani {
   ongorulen_bitis    String
   toplam_adam_saat   Float
 
-  // İşe özel mesai override (Opsiyonel)
   ozel_mesai_gun     Int?
   ozel_mesai_saat    Float?
 }

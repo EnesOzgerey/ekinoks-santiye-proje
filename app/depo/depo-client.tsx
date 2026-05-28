@@ -195,7 +195,7 @@ export default function DepoClient({ initialData, kutuphaneData = [], kayitliDur
               'bg-slate-900/60 text-slate-400 border-slate-700/50'
             }`}>
               {getStatusDot(seciliDurum)}
-              {seciliDurum === 'ONAYLI' ? 'Onaylı' : seciliDurum === 'ONAY_BEKLIYOR' ? 'Onay Bekliyor' : 'İdareye Sunulmadı'}
+              {seciliDurum === 'ONAYLI' ? 'Onaylı' : seciliDurum === 'ONAY_BEKLIYOR' ? 'Onay Bekliyor' : 'Sunulmadı'}
             </div>
          )}
 

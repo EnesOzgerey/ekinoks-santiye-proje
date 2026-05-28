@@ -15,11 +15,15 @@ export default async function ImalatPlanlaPage() {
     orderBy: { malzeme_adi: 'asc' }
   });
 
-  // Depodaki toplam kalan miktarları hesaplıyoruz
   const depoMaddeler = await prisma.depoMalzeme.findMany({
     include: { tedarikciler: true }
   });
-  const imalatlar = await prisma.gunluk_imalat.findMany();
+
+  // HATA ÇÖZÜMÜ VE OPTİMİZASYON: 
+  // Tüm imalatları tek seferde tarihe göre sıralı çekiyoruz.
+  const imalatlar = await prisma.gunluk_imalat.findMany({
+    orderBy: { tarih: 'asc' }
+  });
 
   const depoStokDurumu = depoMaddeler.map(d => {
     let toplamTedarik = d.tedarikciler.reduce((sum, t) => sum + t.miktar, 0);
@@ -42,12 +46,17 @@ export default async function ImalatPlanlaPage() {
     };
   });
 
+  // Prisma Client hatasını aşmak için veritabanına tekrar sorgu atmak yerine, 
+  // halihazırda çektiğimiz "imalatlar" verisini bellekte (memory) filtreliyoruz.
+  const bagliImalatlar = imalatlar.filter((im: any) => im.plan_id != null);
+
   return (
     <PlanlaClient 
       ayarlar={ayarlar} 
       planlar={planlar} 
       adamSaatVerileri={adamSaatVerileri} 
-      depoStokDurumu={depoStokDurumu} 
+      depoStokDurumu={depoStokDurumu}
+      bagliImalatlar={bagliImalatlar}
     />
   );
 }
