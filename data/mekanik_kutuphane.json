@@ -1,0 +1,188 @@
+{
+  "mekanik_tesisat_kutuphanesi": {
+    "versiyon": "2.0.0",
+    "guncelleme_tarihi": "2026-05-28",
+    "kategoriler": [
+      {
+        "kategori_id": "K01",
+        "kategori_adi": "Borular",
+        "alt_kategoriler": [
+          {
+            "ad": "PPRC Borular (Sıcak/Soğuk Su)",
+            "standartlar": ["TS EN 15874"],
+            "varyasyonlar": ["Standart (Düz)", "Cam Elyaf Takviyeli", "Alüminyum Folyolu", "Ortadan Folyolu", "UV Dayanımlı (Dış Mekan)"],
+            "siniflar_ve_dayanimlar": ["PN10 (SDR 11)", "PN16 (SDR 7.4)", "PN20 (SDR 6)", "PN25 (SDR 5)"],
+            "olculer": ["Ø20 mm", "Ø25 mm", "Ø32 mm", "Ø40 mm", "Ø50 mm", "Ø63 mm", "Ø75 mm", "Ø90 mm", "Ø110 mm", "Ø125 mm", "Ø160 mm"],
+            "olcu_birimi": "m",
+            "alternatif_olcu_birimi": "adet"
+          },
+          {
+            "ad": "PVC-U Borular (Atık Su)",
+            "standartlar": ["TS EN 1329-1", "TS EN 1401-1"],
+            "varyasyonlar": ["Standart PVC-U (B Sınıfı - Bina İçi)", "Standart PVC-U (BD Sınıfı - Bina İçi ve Zemin Altı)", "Sessiz Boru (3 Katmanlı)", "Mineral Katkılı Tam Sessiz Boru (Pik Döküm Muadili)"],
+            "siniflar_ve_dayanimlar": ["Tip 1 (İnce Et Kalınlığı)", "Tip 2 (Kalın Et Kalınlığı)", "SN4 (Halka Rijitliği)", "SN8 (Ağır Yük Halka Rijitliği)"],
+            "olculer": ["Ø50 mm", "Ø75 mm", "Ø110 mm", "Ø125 mm", "Ø160 mm", "Ø200 mm", "Ø250 mm", "Ø315 mm", "Ø400 mm"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "m"
+          },
+          {
+            "ad": "Galvanizli Çelik Borular",
+            "standartlar": ["TS EN 10255"],
+            "varyasyonlar": ["Dikişli (Dişli Uçlu)", "Dikişli (Düz Uçlu)", "Dikişli (Yivli Uçlu)"],
+            "siniflar_ve_dayanimlar": ["Hafif Seri (L)", "Orta Seri (M)", "Ağır Seri (H)"],
+            "olculer": ["DN15 (1/2\")", "DN20 (3/4\")", "DN25 (1\")", "DN32 (1 1/4\")", "DN40 (1 1/2\")", "DN50 (2\")", "DN65 (2 1/2\")", "DN80 (3\")", "DN100 (4\")", "DN125 (5\")", "DN150 (6\")", "DN200 (8\")"],
+            "olcu_birimi": "m",
+            "alternatif_olcu_birimi": "adet"
+          },
+          {
+            "ad": "Siyah Çelik Borular",
+            "standartlar": ["TS EN 10220", "API 5L"],
+            "varyasyonlar": ["Dikişli (ERW)", "Dikişsiz (Çekme / Seamless)", "Polietilen Kaplı (Doğalgaz)", "Yivli Bağlantıya Uygun"],
+            "siniflar_ve_dayanimlar": ["Standart Et Kalınlığı", "Sch 10", "Sch 20", "Sch 40", "Sch 80"],
+            "olculer": ["DN15 (1/2\")", "DN20 (3/4\")", "DN25 (1\")", "DN32 (1 1/4\")", "DN40 (1 1/2\")", "DN50 (2\")", "DN65 (2 1/2\")", "DN80 (3\")", "DN100 (4\")", "DN125 (5\")", "DN150 (6\")", "DN200 (8\")", "DN250 (10\")", "DN300 (12\")", "DN400 (16\")"],
+            "olcu_birimi": "m",
+            "alternatif_olcu_birimi": "adet"
+          },
+          {
+            "ad": "HDPE Borular (Altyapı)",
+            "standartlar": ["TS EN 12201-2", "TS EN 13476"],
+            "varyasyonlar": ["Düz Boru (Şebeke)", "Koruge Boru", "Drenaj Borusu (Delikli)"],
+            "siniflar_ve_dayanimlar": ["PE100 PN10", "PE100 PN16", "SN4 (Koruge)", "SN8 (Koruge)"],
+            "olculer": ["Ø20 mm", "Ø25 mm", "Ø32 mm", "Ø40 mm", "Ø50 mm", "Ø63 mm", "Ø75 mm", "Ø90 mm", "Ø110 mm", "Ø125 mm", "Ø160 mm", "Ø200 mm", "Ø250 mm", "Ø315 mm", "Ø400 mm", "Ø500 mm", "Ø630 mm"],
+            "olcu_birimi": "m",
+            "alternatif_olcu_birimi": "adet"
+          },
+          {
+            "ad": "Esnek (Flex) Borular",
+            "standartlar": ["TS EN 14800", "TS EN 14585"],
+            "varyasyonlar": ["Fan Coil Bağlantı Hortumu", "Sprinkler Bağlantı Hortumu", "Doğalgaz Bağlantı Flexi", "Kombi Flexi"],
+            "siniflar_ve_dayanimlar": ["İzoleli", "İzolesiz", "Örgülü", "Örgüsüz"],
+            "olculer": ["DN15 - 30cm", "DN15 - 50cm", "DN15 - 70cm", "DN20 - 50cm", "DN20 - 70cm", "DN25 - 50cm", "DN25 - 100cm"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "set"
+          }
+        ]
+      },
+      {
+        "kategori_id": "K02",
+        "kategori_adi": "Vanalar ve Armatürler",
+        "alt_kategoriler": [
+          {
+            "ad": "Küresel Vanalar",
+            "varyasyonlar": ["Pirinç (Dişli)", "Pirinç (Tam Geçişli)", "Döküm (Flanşlı)", "Paslanmaz Çelik", "Doğalgaz Vanası (Sarı/Kilitli)", "Mini Küresel Vana"],
+            "siniflar_ve_dayanimlar": ["PN10", "PN16", "PN25", "PN40"],
+            "olculer": ["DN15 (1/2\")", "DN20 (3/4\")", "DN25 (1\")", "DN32 (1 1/4\")", "DN40 (1 1/2\")", "DN50 (2\")", "DN65", "DN80", "DN100", "DN125", "DN150", "DN200"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "kutu"
+          },
+          {
+            "ad": "Kelebek Vanalar",
+            "varyasyonlar": ["Wafer Tip", "Lug Tip", "Çift Eksantrik", "Sfero Döküm", "Paslanmaz Diskli", "Dişli Kutulu (Gearbox)", "İzleme Anahtarlı (Yangın)"],
+            "siniflar_ve_dayanimlar": ["PN10", "PN16", "PN25"],
+            "olculer": ["DN32", "DN40", "DN50", "DN65", "DN80", "DN100", "DN125", "DN150", "DN200", "DN250", "DN300", "DN350", "DN400", "DN500", "DN600"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "kutu"
+          },
+          {
+            "ad": "Çekvalfler (Geri Tepme Ventili)",
+            "varyasyonlar": ["Çalpara (Pirinç/Dişli)", "Yaylı (Pirinç/Dişli)", "Çift Plakalı (Dual Plate - Flanşlı)", "Disk Çekvalf", "Toplu Çekvalf (Atıksu için)"],
+            "siniflar_ve_dayanimlar": ["PN10", "PN16", "PN25"],
+            "olculer": ["DN15", "DN20", "DN25", "DN32", "DN40", "DN50", "DN65", "DN80", "DN100", "DN125", "DN150", "DN200", "DN250", "DN300"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "kutu"
+          },
+          {
+            "ad": "Balans Vanaları",
+            "varyasyonlar": ["Statik Balans Vanası (Dişli/Pirinç)", "Statik Balans Vanası (Flanşlı)", "Dinamik (Fark Basınç Kontrol) Vanası", "Basınçtan Bağımsız Kontrol Vanası (PICV)"],
+            "siniflar_ve_dayanimlar": ["PN16", "PN25"],
+            "olculer": ["DN15", "DN20", "DN25", "DN32", "DN40", "DN50", "DN65", "DN80", "DN100", "DN125", "DN150", "DN200"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "kutu"
+          }
+        ]
+      },
+      {
+        "kategori_id": "K03",
+        "kategori_adi": "İzolasyon (Yalıtım) Malzemeleri",
+        "alt_kategoriler": [
+          {
+            "ad": "Elastomerik Kauçuk Köpüğü (Boru Tipi)",
+            "varyasyonlar": ["Standart (Alüminyum Folyosuz)", "Alüminyum Folyolu", "PVC Kaplı"],
+            "siniflar_ve_dayanimlar": ["9 mm Kalınlık", "13 mm Kalınlık", "19 mm Kalınlık", "25 mm Kalınlık", "32 mm Kalınlık"],
+            "olculer": ["Ø15 mm Boru İçin", "Ø18 mm Boru İçin", "Ø22 mm Boru İçin", "Ø28 mm Boru İçin", "Ø35 mm Boru İçin", "Ø42 mm Boru İçin", "Ø48 mm Boru İçin", "Ø54 mm Boru İçin", "Ø60 mm Boru İçin", "Ø76 mm Boru İçin", "Ø89 mm Boru İçin", "Ø114 mm Boru İçin"],
+            "olcu_birimi": "m",
+            "alternatif_olcu_birimi": "kutu"
+          },
+          {
+            "ad": "Elastomerik Kauçuk Köpüğü (Levha Tipi)",
+            "varyasyonlar": ["Standart", "Kendinden Yapışkanlı", "Alüminyum Folyolu ve Yapışkanlı"],
+            "siniflar_ve_dayanimlar": ["6 mm Kalınlık", "9 mm Kalınlık", "13 mm Kalınlık", "19 mm Kalınlık", "25 mm Kalınlık", "32 mm Kalınlık", "50 mm Kalınlık"],
+            "olculer": ["Levha (Rulo)"],
+            "olcu_birimi": "m2",
+            "alternatif_olcu_birimi": "rulo"
+          },
+          {
+            "ad": "Taşyünü / Camyünü",
+            "varyasyonlar": ["Prefabrik Boru Camyünü (Folyolu)", "Prefabrik Boru Camyünü (Folyosuz)", "Taşyünü Klima Şiltesi", "Taşyünü Sanayi Şiltesi"],
+            "siniflar_ve_dayanimlar": ["25 mm Kalınlık", "30 mm Kalınlık", "40 mm Kalınlık", "50 mm Kalınlık", "80 mm Kalınlık", "100 mm Kalınlık"],
+            "olculer": ["Levha/Şilte", "Standart Boru Çaplarına Uygun"],
+            "olcu_birimi": "m2",
+            "alternatif_olcu_birimi": "paket"
+          }
+        ]
+      },
+      {
+        "kategori_id": "K04",
+        "kategori_adi": "Havalandırma Tesisatı",
+        "alt_kategoriler": [
+          {
+            "ad": "Hava Kanalları",
+            "varyasyonlar": ["Galvaniz Sac Dairesel (Spiro) Kanal", "Galvaniz Sac Prizmatik Kanal (Flanşlı)", "Paslanmaz Çelik Kanal", "Siyah Sac Kaynaklı Kanal (Egzoz/Duman)"],
+            "siniflar_ve_dayanimlar": ["0.6 mm Sac Kalınlığı", "0.8 mm Sac Kalınlığı", "1.0 mm Sac Kalınlığı", "1.2 mm Sac Kalınlığı"],
+            "olculer": ["Proje Bazlı Ölçüler", "Ø100 - Ø1250 Spiro Çapları"],
+            "olcu_birimi": "m2",
+            "alternatif_olcu_birimi": "kg"
+          },
+          {
+            "ad": "Esnek Hava Kanalları (Flexible)",
+            "varyasyonlar": ["Alüminyum Esnek Kanal (İzolesiz)", "Alüminyum Esnek Kanal (İzoleli)", "Sonotex (Akustik İzoleli)", "PVC Esnek Kanal"],
+            "siniflar_ve_dayanimlar": ["Standart Seri", "Ağır Seri"],
+            "olculer": ["Ø102 mm", "Ø127 mm", "Ø152 mm", "Ø203 mm", "Ø254 mm", "Ø305 mm", "Ø315 mm", "Ø356 mm", "Ø406 mm"],
+            "olcu_birimi": "kutu (10m)",
+            "alternatif_olcu_birimi": "m"
+          }
+        ]
+      },
+      {
+        "kategori_id": "K05",
+        "kategori_adi": "Yangın Tesisatı",
+        "alt_kategoriler": [
+          {
+            "ad": "Sprinkler Başlıkları",
+            "varyasyonlar": ["Pendent (Aşağı Sarkık)", "Upright (Yukarı Dönük)", "Sidewall (Duvar Tipi)", "Gizli Tip (Concealed)"],
+            "siniflar_ve_dayanimlar": ["Standart Tepkimeli", "Hızlı Tepkimeli", "57°C", "68°C", "79°C", "93°C", "141°C"],
+            "olculer": ["1/2\" NPT", "3/4\" NPT"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "kutu"
+          },
+          {
+            "ad": "Yangın Vanaları ve Ekipmanları",
+            "varyasyonlar": ["Islak Alarm Vanası Seti", "Kuru Alarm Vanası Seti", "OS&Y Yükselen Milli Vana", "Akış Anahtarı (Flow Switch)", "Test ve Drenaj Vanası", "İtfaiye Bağlantı Ağzı (Siyam İkizi)"],
+            "siniflar_ve_dayanimlar": ["300 psi", "175 psi"],
+            "olculer": ["DN50", "DN65", "DN80", "DN100", "DN150", "DN200"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "set"
+          },
+          {
+            "ad": "Yivli (Grooved) Bağlantı Parçaları",
+            "varyasyonlar": ["Rijit Kaplin", "Esnek Kaplin", "Yivli Dirsek (90° / 45°)", "Yivli Eşit Te", "Mekanik Te (U Cıvatalı / Yivli)", "Yivli Flanş Adaptörü", "Yivli Redüksiyon", "Yivli Kep"],
+            "siniflar_ve_dayanimlar": ["Kırmızı Boyalı", "Galvanizli", "300 psi", "PN16"],
+            "olculer": ["DN50", "DN65", "DN80", "DN100", "DN125", "DN150", "DN200"],
+            "olcu_birimi": "adet",
+            "alternatif_olcu_birimi": "kutu"
+          }
+        ]
+      }
+    ]
+  }
+}

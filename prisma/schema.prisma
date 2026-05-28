@@ -9,9 +9,10 @@ datasource db {
 
 // 1. KADEME: Malzeme Cinsi (Örn: PPR Borular)
 model MalzemeCinsi {
-  id       Int       @id @default(autoincrement())
-  name     String    @unique
-  markalar Marka[]
+  id           Int       @id @default(autoincrement())
+  name         String    @unique
+  kutuphane_ad String?   // YENİ: Kütüphaneden gelen asıl master data ismini tutar
+  markalar     Marka[]
 }
 
 // 2. KADEME: Markalar ve Onay Durumları (Örn: Fırat Plastik - ONAYLANDI)
@@ -48,3 +49,57 @@ model gunluk_imalat {
   photos             String?  // Fotoğraf yollarını JSON array (string) olarak tutuyoruz
 }
 
+model DepoMalzeme {
+  id             Int         @id @default(autoincrement())
+  ad             String      // Malzeme Cinsi
+  spesifikasyon  String?     // YENİ: Çap, Basınç Sınıfı, Varyasyon vb.
+  gereken_miktar Float       // Planlanan/Gereken Toplam Miktar
+  birim          String      // m, adet, kg vb.
+  tedarikciler   Tedarikci[] // Altındaki tedarikçi firmalar
+}
+
+model Tedarikci {
+  id               Int         @id @default(autoincrement())
+  depo_malzeme_id  Int
+  firma_adi        String
+  miktar           Float
+  malzeme          DepoMalzeme @relation(fields: [depo_malzeme_id], references: [id], onDelete: Cascade)
+}
+
+model AdamSaatVerisi {
+  id             Int      @id @default(autoincrement())
+  malzeme_adi    String   // Kütüphaneden gelen ana ad
+  cap            String   // Çap / Ölçü (Örn: "Ø110 mm")
+  birim          String   // m, adet vb.
+  gerekli_adam   Int      // Bu iş için gereken minimum montaj ekibi
+  adam_saat      Float    // 1 birim için gereken süre
+
+  // Aynı malzemenin aynı çapına ikinci bir kayıt açılamaz
+  @@unique([malzeme_adi, cap])
+}
+
+
+model PlanlamaAyarlari {
+  id                 Int   @id @default(1)
+  haftalik_mesai_gun Int   @default(6)
+  gunluk_mesai_saat  Float @default(9.0)
+}
+
+model ImalatPlani {
+  id                 Int      @id @default(autoincrement())
+  is_adi             String
+  malzeme_adi        String
+  cap                String
+  miktar             Float
+  birim              String
+  adam_sayisi        Int
+  zorluk_carpan      Float
+  zorluk_ad          String
+  baslangic_tarihi   String
+  ongorulen_bitis    String
+  toplam_adam_saat   Float
+
+  // İşe özel mesai override (Opsiyonel)
+  ozel_mesai_gun     Int?
+  ozel_mesai_saat    Float?
+}

@@ -24,8 +24,7 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
 
   const today = new Date().toISOString().split('T')[0];
 
-  // YENİ: Metraj yerine ayrı miktar (sayısal) ve birim alanları eklendi
-  const emptyMalzeme = { ad: '', miktar: '', birim: 'adet', metraj: '' };
+  const emptyMalzeme = { ad: '', spesifikasyon: '', miktar: '', birim: '', metraj: '' };
   
   const [formState, setFormState] = useState<{
     imalat_adi: string; tarih: string; imalat_yeri: string; calisan_sayisi: number; malzemeler: typeof emptyMalzeme[]; photos: File[]; existing_photos: string[];
@@ -87,12 +86,13 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
       const parsed = JSON.parse(item.kullanilan_malzeme);
       parsedMalzemeler = Array.isArray(parsed) ? parsed.map(m => ({
         ad: m.ad || '',
+        spesifikasyon: m.spesifikasyon || '', 
         miktar: m.miktar || '', 
-        birim: m.birim || 'adet',
-        metraj: m.metraj || '' // Eski kayıtlar için geriye dönük uyumluluk
-      })) : [{ ad: item.kullanilan_malzeme || '', miktar: '', birim: 'adet', metraj: item.metraj || '' }];
+        birim: m.birim || '',
+        metraj: m.metraj || '' 
+      })) : [{ ad: item.kullanilan_malzeme || '', spesifikasyon: '', miktar: '', birim: '', metraj: item.metraj || '' }];
     } catch {
-      parsedMalzemeler = [{ ad: item.kullanilan_malzeme || '', miktar: '', birim: 'adet', metraj: item.metraj || '' }];
+      parsedMalzemeler = [{ ad: item.kullanilan_malzeme || '', spesifikasyon: '', miktar: '', birim: '', metraj: item.metraj || '' }];
     }
     if (parsedMalzemeler.length === 0) parsedMalzemeler = [{ ...emptyMalzeme }];
 
@@ -117,15 +117,11 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
     if (!formState.imalat_adi) return alert("İmalat adı zorunludur!");
     
     const validMalzemeler = formState.malzemeler.filter(m => m.ad.trim() !== '');
-    const unapproved = validMalzemeler.find(m => {
-      const found = kayitliMalzemeler.find(k => k.ad === m.ad);
-      return found && found.durum !== 'ONAYLANDI';
-    });
-
-    if (unapproved) {
-      if (!window.confirm(`⚠️ DİKKAT: Seçtiğiniz "${unapproved.ad}" adlı malzeme henüz ONAYLANMAMIŞ durumdadır.\n\nBuna rağmen imalata eklemek istediğinize emin misiniz?`)) {
-        return; 
-      }
+    
+    // SIKI DENETİM: Malzemenin adı ve spesifikasyonu depoyla tam eşleşmeli
+    const invalidMaterial = validMalzemeler.find(m => !kayitliMalzemeler.some(k => k.ad === m.ad && (k.spesifikasyon || '') === (m.spesifikasyon || '')));
+    if (invalidMaterial) {
+      return alert(`⚠️ DİKKAT: Seçtiğiniz "${invalidMaterial.ad}" depo kayıtlarında bulunamadı.\nLütfen sadece depoda tanımlı malzemeleri seçin.`);
     }
     
     setLoading(true);
@@ -137,7 +133,6 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
       data.append('imalat_yeri', formState.imalat_yeri);
       data.append('calisan_sayisi', formState.calisan_sayisi.toString());
       
-      // Miktar ve Birim JSON ile doğrudan DB'ye aktarılıyor
       data.append('kullanilan_malzeme', JSON.stringify(validMalzemeler));
       data.append('metraj', ''); 
       
@@ -175,7 +170,11 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
   const renderInputRows = (isNew: boolean) => {
     return formState.malzemeler.map((malz, index) => {
       
-      const currentList = kayitliMalzemeler.filter(c => c.ad.toLowerCase().includes(malz.ad.toLowerCase()));
+      const currentList = kayitliMalzemeler.filter(c => 
+        `${c.ad} ${c.spesifikasyon || ''}`.toLowerCase().includes(malz.ad.toLowerCase())
+      );
+      
+      const isMaterialValid = malz.ad === '' || kayitliMalzemeler.some(k => k.ad === malz.ad && (k.spesifikasyon || '') === malz.spesifikasyon);
 
       const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'ArrowDown') { e.preventDefault(); setFocusedListIndex(prev => Math.min(prev + 1, currentList.length - 1)); }
@@ -183,7 +182,10 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
         else if (e.key === 'Enter') {
           e.preventDefault();
           if (focusedListIndex >= 0 && currentList[focusedListIndex]) {
-            handleMalzemeChange(index, 'ad', currentList[focusedListIndex].ad);
+            const selected = currentList[focusedListIndex];
+            const newMalz = [...formState.malzemeler];
+            newMalz[index] = { ...newMalz[index], ad: selected.ad, spesifikasyon: selected.spesifikasyon || '', birim: selected.birim };
+            setFormState({ ...formState, malzemeler: newMalz });
             setActiveAutoIndex(null);
           }
         }
@@ -193,41 +195,55 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
         <tr key={`form-${index}`} className={`bg-[#131316] ${index === 0 ? 'border-t-2 border-blue-500/50' : 'border-t border-zinc-800/40 shadow-[inset_0_0_20px_rgba(37,99,235,0.05)]'}`}>
           
           {index === 0 && (
-            <td className="p-3 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
+            <td className="p-4 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
               <div className="flex flex-col items-center gap-2">
-                <input type="text" placeholder="İmalat / İş Kalemi *" value={formState.imalat_adi} onChange={e => setFormState({...formState, imalat_adi: e.target.value})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"/>
-                <input type="date" value={formState.tarih} onChange={e => setFormState({...formState, tarih: e.target.value})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-zinc-400 outline-none text-center [color-scheme:dark]"/>
+                <input type="text" placeholder="İmalat / İş Kalemi *" value={formState.imalat_adi} onChange={e => setFormState({...formState, imalat_adi: e.target.value})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded-lg p-2 text-xs text-white outline-none text-center transition-colors"/>
+                <input type="date" value={formState.tarih} onChange={e => setFormState({...formState, tarih: e.target.value})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded-lg p-2 text-xs text-zinc-400 outline-none text-center transition-colors [color-scheme:dark]"/>
               </div>
             </td>
           )}
 
-          <td className="p-3 align-middle text-center border-r border-zinc-800/30 relative">
+          <td className="p-4 align-middle text-center border-r border-zinc-800/30 relative">
             <input 
-              type="text" placeholder="Kullanılan Malzeme (Ara)" value={malz.ad} 
+              type="text" placeholder="Depodan Malzeme Ara..." value={malz.ad} 
               onChange={e => { handleMalzemeChange(index, 'ad', e.target.value); setActiveAutoIndex(index); setFocusedListIndex(-1); }}
               onFocus={() => setActiveAutoIndex(index)} 
               onBlur={() => setTimeout(() => setActiveAutoIndex(null), 200)}
               onKeyDown={handleKeyDown}
-              className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"
+              className={`w-full bg-[#18181b] border ${isMaterialValid ? 'border-zinc-700 focus:border-blue-500' : 'border-red-500 focus:border-red-500 text-red-300'} rounded-lg p-2 text-xs text-white outline-none text-center transition-colors`}
             />
+            {malz.spesifikasyon && <div className="text-[10px] text-zinc-400 mt-1.5">{malz.spesifikasyon}</div>}
+
             {activeAutoIndex === index && malz.ad && currentList.length > 0 && (
-              <ul className="absolute z-50 left-3 right-3 mt-1 bg-zinc-800 border border-zinc-700 rounded shadow-2xl max-h-40 overflow-y-auto text-left">
+              <ul className="absolute z-50 left-4 right-4 mt-1 bg-[#18181b] border border-zinc-700 rounded-lg shadow-2xl max-h-48 overflow-y-auto custom-scrollbar text-left">
                 {currentList.map((c, i) => (
                   <li 
                     key={i} 
-                    onMouseDown={() => { handleMalzemeChange(index, 'ad', c.ad); setActiveAutoIndex(null); }}
-                    className={`px-3 py-2 text-xs cursor-pointer flex justify-between ${i === focusedListIndex ? 'bg-blue-600 text-white' : 'text-zinc-300 hover:bg-zinc-700'}`}
+                    onMouseDown={() => { 
+                      const newMalz = [...formState.malzemeler];
+                      newMalz[index] = { ...newMalz[index], ad: c.ad, spesifikasyon: c.spesifikasyon || '', birim: c.birim };
+                      setFormState({ ...formState, malzemeler: newMalz });
+                      setActiveAutoIndex(null); 
+                    }}
+                    className={`px-3 py-2 text-xs cursor-pointer flex flex-col gap-1 border-b border-zinc-800/50 transition-colors ${i === focusedListIndex ? 'bg-blue-600 text-white' : 'text-zinc-300 hover:bg-zinc-800'}`}
                   >
-                    <span className="truncate pr-2">{c.ad}</span>
-                    {c.durum !== 'ONAYLANDI' && <span className="text-amber-500 font-bold shrink-0">[{c.durum}]</span>}
+                    <div className="flex justify-between items-center w-full">
+                      <span className="truncate pr-2 font-bold">{c.ad}</span>
+                      <span className="text-[9px] font-bold text-zinc-400 bg-zinc-900 px-1.5 py-0.5 rounded shrink-0 border border-zinc-700">{c.birim}</span>
+                    </div>
+                    {c.spesifikasyon && <span className="text-[10px] text-zinc-500 truncate">{c.spesifikasyon}</span>}
                   </li>
                 ))}
               </ul>
             )}
+            {activeAutoIndex === index && malz.ad && currentList.length === 0 && (
+              <div className="absolute z-50 left-4 right-4 mt-1 bg-[#18181b] border border-red-500/50 rounded-lg p-3 text-xs text-red-400 font-bold shadow-2xl">
+                Depoda bulunamadı!
+              </div>
+            )}
           </td>
 
-          {/* YENİ: MİKTAR VE BİRİM KUTUCUKLARI (DEPOCU FORMATI) */}
-          <td className="p-3 align-middle text-center border-r border-zinc-800/30">
+          <td className="p-4 align-middle text-center border-r border-zinc-800/30">
             <div className="flex justify-center items-center gap-1.5">
               <input 
                 type="number" 
@@ -235,23 +251,16 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
                 placeholder="Miktar" 
                 value={malz.miktar} 
                 onChange={e => handleMalzemeChange(index, 'miktar', e.target.value)} 
-                className="w-[70px] bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"
+                className="w-[70px] bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded-lg p-2 text-xs text-white outline-none text-center transition-colors"
               />
-              <select 
-                value={malz.birim} 
-                onChange={e => handleMalzemeChange(index, 'birim', e.target.value)} 
-                className="w-[65px] bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-zinc-300 outline-none text-center cursor-pointer"
+              
+              {/* DIŞARIDAN MÜDAHALEYE KAPALI BİRİM KUTUSU */}
+              <div 
+                className="w-[65px] bg-[#131316] border border-zinc-800 rounded-lg p-2 text-xs font-bold text-zinc-500 flex items-center justify-center cursor-not-allowed select-none transition-colors"
+                title="Birim depodan otomatik çekilir"
               >
-                <option value="adet">adet</option>
-                <option value="m">m</option>
-                <option value="m2">m²</option>
-                <option value="m3">m³</option>
-                <option value="kg">kg</option>
-                <option value="ton">ton</option>
-                <option value="lt">lt</option>
-                <option value="cm">cm</option>
-                <option value="set">set</option>
-              </select>
+                {malz.ad && malz.birim ? malz.birim : '-'}
+              </div>
 
               <div className="flex items-center gap-1 ml-1">
                 {formState.malzemeler.length > 1 && <button onClick={() => removeMalzeme(index)} type="button" className="p-1.5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors">🗑️</button>}
@@ -262,32 +271,32 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
 
           {index === 0 && (
             <>
-              <td className="p-3 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
-                <input type="text" placeholder="İmalat Yeri" value={formState.imalat_yeri} onChange={e => setFormState({...formState, imalat_yeri: e.target.value})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"/>
+              <td className="p-4 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
+                <input type="text" placeholder="İmalat Yeri" value={formState.imalat_yeri} onChange={e => setFormState({...formState, imalat_yeri: e.target.value})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded-lg p-2 text-xs text-white outline-none text-center transition-colors"/>
               </td>
-              <td className="p-3 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
-                <input type="number" placeholder="Ekip" value={formState.calisan_sayisi || ''} onChange={e => setFormState({...formState, calisan_sayisi: parseInt(e.target.value) || 0})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded p-1.5 text-xs text-white outline-none text-center"/>
+              <td className="p-4 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
+                <input type="number" placeholder="Ekip" value={formState.calisan_sayisi || ''} onChange={e => setFormState({...formState, calisan_sayisi: parseInt(e.target.value) || 0})} className="w-full bg-[#18181b] border border-zinc-700 focus:border-blue-500 rounded-lg p-2 text-xs text-white outline-none text-center transition-colors"/>
               </td>
-              <td className="p-3 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
+              <td className="p-4 align-middle text-center border-r border-zinc-800/30" rowSpan={formState.malzemeler.length}>
                 <div className="flex flex-col items-center gap-2 h-full">
                   <div className="flex items-center gap-2">
-                    <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-2 py-1 rounded text-[10px] font-bold cursor-pointer transition-colors border border-zinc-700 flex items-center gap-1">
+                    <label className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-md text-[10px] font-bold cursor-pointer transition-colors border border-zinc-700 flex items-center gap-1">
                       📸 Seç
                       <input type="file" multiple accept="image/*" className="hidden" onChange={e => {
                         if (e.target.files) setFormState({...formState, photos: [...formState.photos, ...Array.from(e.target.files)]})
                       }}/>
                     </label>
-                    <span className="text-[10px] text-zinc-500">{formState.photos.length} yeni</span>
+                    <span className="text-[10px] text-zinc-500 font-medium">{formState.photos.length} yeni</span>
                   </div>
-                  <div className="flex flex-wrap justify-center gap-1 mt-1 overflow-y-auto max-h-[50px] custom-scrollbar">
+                  <div className="flex flex-wrap justify-center gap-1.5 mt-1 overflow-y-auto max-h-[50px] custom-scrollbar">
                      {formState.existing_photos.map((p, idx) => (
-                       <div key={`old-${idx}`} className="relative group w-7 h-7 rounded overflow-hidden border border-zinc-700">
+                       <div key={`old-${idx}`} className="relative group w-8 h-8 rounded border border-zinc-700 overflow-hidden">
                          <img src={p} alt="eski" className="w-full h-full object-cover" />
                          <button onClick={() => setFormState({...formState, existing_photos: formState.existing_photos.filter(ep => ep !== p)})} className="absolute inset-0 bg-red-500/80 text-white font-bold text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button>
                        </div>
                      ))}
                      {formState.photos.map((f, idx) => (
-                       <div key={`new-${idx}`} className="relative group w-7 h-7 rounded overflow-hidden border border-blue-500">
+                       <div key={`new-${idx}`} className="relative group w-8 h-8 rounded border border-blue-500 overflow-hidden">
                          <img src={URL.createObjectURL(f)} alt="yeni" className="w-full h-full object-cover" />
                          <button onClick={() => setFormState({...formState, photos: formState.photos.filter((_, i) => i !== idx)})} className="absolute inset-0 bg-red-500/80 text-white font-bold text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">X</button>
                        </div>
@@ -295,10 +304,18 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
                   </div>
                 </div>
               </td>
-              <td className="p-3 align-middle text-center" rowSpan={formState.malzemeler.length}>
-                <div className="flex flex-row gap-1.5 items-center justify-center h-full">
-                  <button onClick={handleCancel} className="bg-zinc-800 hover:bg-zinc-700 px-3 py-1.5 rounded text-[10px] text-zinc-300 font-bold transition-colors">İptal</button>
-                  <button onClick={handleSave} disabled={loading} className="bg-blue-600 hover:bg-blue-500 px-3 py-1.5 rounded text-[10px] text-white font-bold transition-colors">{loading ? '...' : 'Kaydet'}</button>
+              <td className="p-4 align-middle text-center" rowSpan={formState.malzemeler.length}>
+                <div className="flex flex-col gap-2 items-center justify-center h-full w-full">
+                  <button 
+                    onClick={handleSave} 
+                    disabled={loading || formState.malzemeler.some(m => m.ad.trim() !== '' && !kayitliMalzemeler.some(k => k.ad === m.ad && (k.spesifikasyon || '') === m.spesifikasyon))} 
+                    className="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-800 disabled:text-zinc-500 disabled:cursor-not-allowed py-2.5 rounded-lg text-[11px] text-white font-bold tracking-wider transition-colors shadow-lg"
+                  >
+                    {loading ? '...' : 'KAYDET'}
+                  </button>
+                  <button onClick={handleCancel} className="w-full bg-zinc-800 hover:bg-zinc-700 py-2.5 rounded-lg text-[11px] text-zinc-300 font-bold tracking-wider transition-colors">
+                    İPTAL
+                  </button>
                 </div>
               </td>
             </>
@@ -311,47 +328,49 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
   return (
     <div className="max-w-[1500px] mx-auto p-6 bg-zinc-950 min-h-screen text-zinc-100 print:bg-white print:text-black print:p-0">
       
+      {/* STANDART ÜST BAR VE TOOLBAR */}
       <div className="mb-6 flex flex-col gap-4 print:hidden">
-        <h1 className="text-xl font-bold tracking-tight">Günlük Saha İmalat Paneli</h1>
-        <div className="flex flex-wrap items-center gap-3 bg-zinc-900/40 p-2 rounded-lg border border-zinc-800/60 w-fit shadow-sm relative z-40">
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-100">Günlük Saha İmalat Paneli</h1>
+        <div className="flex flex-wrap items-center gap-3 bg-[#131316] p-2.5 rounded-xl border border-zinc-800 shadow-xl relative z-40 w-fit">
           <div className="relative">
-            <input type="text" placeholder="Ara (İmalat, Malzeme, Yer)..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-[#131316] border border-zinc-800 text-xs rounded-md pl-8 pr-3 py-2 text-zinc-300 focus:outline-none focus:border-blue-500 w-64"/>
-            <span className="absolute left-2.5 top-2 text-zinc-600 text-sm">🔍</span>
+            <input type="text" placeholder="Ara (İmalat, Malzeme, Yer)..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="bg-[#18181b] border border-zinc-700 text-xs rounded-lg pl-8 pr-3 py-2.5 text-zinc-300 focus:outline-none focus:border-blue-500 w-64 transition-colors"/>
+            <span className="absolute left-3 top-2.5 text-zinc-500 text-sm">🔍</span>
           </div>
 
           <div className="relative">
-            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`bg-[#131316] border text-xs font-bold rounded-md px-4 py-2 flex items-center gap-2 transition-colors ${selectedDates.length > 0 ? 'border-blue-500/50 text-blue-400' : 'border-zinc-800 text-zinc-400 hover:border-zinc-600'}`}>
+            <button onClick={() => setShowDatePicker(!showDatePicker)} className={`bg-[#18181b] border text-xs font-bold rounded-lg px-4 py-2.5 flex items-center gap-2 transition-colors ${selectedDates.length > 0 ? 'border-blue-500 text-blue-400' : 'border-zinc-700 text-zinc-400 hover:border-zinc-500'}`}>
               📅 {selectedDates.length > 0 ? `${selectedDates.length} Gün Seçildi` : 'Tarih Filtresi'}
             </button>
             {showDatePicker && (
-              <div className="absolute top-full mt-2 left-0 bg-[#131316] border border-zinc-800 p-3 rounded-xl shadow-2xl z-50 min-w-[300px]">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-bold text-zinc-400">Takvimden Gün Seçin</span>
+              <div className="absolute top-full mt-2 left-0 bg-[#131316] border border-zinc-800 p-4 rounded-xl shadow-2xl z-50 min-w-[300px]">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">Takvimden Gün Seçin</span>
                   <button onClick={() => setShowDatePicker(false)} className="text-zinc-500 hover:text-white">✕</button>
                 </div>
                 <MultiDatePicker selectedDates={selectedDates} onChange={setSelectedDates} />
-                {selectedDates.length > 0 && <button onClick={() => setSelectedDates([])} className="mt-3 w-full text-center text-[10px] text-zinc-500 hover:text-red-400 underline py-1">Temizle</button>}
+                {selectedDates.length > 0 && <button onClick={() => setSelectedDates([])} className="mt-4 w-full text-center text-[10px] text-red-400 font-bold hover:bg-red-500/10 rounded-lg py-2 transition-colors">Seçimleri Temizle</button>}
               </div>
             )}
           </div>
-          <div className="w-px h-5 bg-zinc-700/50 mx-1"></div>
-          <button onClick={handleExportExcel} disabled={docLoading || filteredImalatlar.length === 0} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-md text-xs font-bold shadow-md shadow-emerald-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+          <div className="w-px h-6 bg-zinc-800 mx-1"></div>
+          <button onClick={handleExportExcel} disabled={docLoading || filteredImalatlar.length === 0} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2.5 rounded-lg text-xs font-bold shadow-lg shadow-emerald-900/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
             {docLoading ? '⏳ Hazırlanıyor...' : '📊 Excel Raporu İndir'}
           </button>
         </div>
       </div>
 
-      <div className="bg-[#0f0f11] border border-zinc-800 rounded-xl overflow-visible shadow-2xl print:border-0 print:shadow-none">
+      {/* STANDART TABLO YAPISI */}
+      <div className="bg-[#0f0f11] border border-zinc-800 rounded-2xl overflow-visible shadow-2xl print:border-0 print:shadow-none">
         <table className="w-full text-left text-xs border-collapse min-w-[1000px] print:text-black">
           <thead>
-            <tr className="bg-zinc-950 text-zinc-500 font-bold uppercase tracking-wider border-b border-zinc-800 print:bg-transparent print:border-black print:text-black">
-              <th className="p-3 w-[20%] text-center">İMALAT ADI & TARİH</th>
-              <th className="p-3 w-[25%] text-center">KULLANILAN MALZEME</th>
-              <th className="p-3 w-[15%] text-center">MİKTAR</th>
-              <th className="p-3 w-[15%] text-center">YER / LOKASYON</th>
-              <th className="p-3 w-[5%] text-center">EKİP</th>
-              <th className="p-3 w-[12%] text-center print:hidden">FOTOĞRAFLAR</th>
-              <th className="p-3 w-[8%] text-center print:hidden">İŞLEMLER</th>
+            <tr className="bg-[#131316] text-zinc-500 font-bold uppercase tracking-widest border-b border-zinc-800 print:bg-transparent print:border-black print:text-black">
+              <th className="p-4 w-[20%] text-center rounded-tl-2xl print:rounded-none">İMALAT ADI & TARİH</th>
+              <th className="p-4 w-[25%] text-center">KULLANILAN MALZEME</th>
+              <th className="p-4 w-[15%] text-center">MİKTAR</th>
+              <th className="p-4 w-[15%] text-center">YER / LOKASYON</th>
+              <th className="p-4 w-[5%] text-center">EKİP</th>
+              <th className="p-4 w-[12%] text-center print:hidden">FOTOĞRAFLAR</th>
+              <th className="p-4 w-[8%] text-center rounded-tr-2xl print:hidden print:rounded-none">İŞLEMLER</th>
             </tr>
           </thead>
           <tbody onMouseLeave={() => setHoveredRow(null)}>
@@ -385,53 +404,56 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
                   className={`border-b border-zinc-800/40 transition-colors ${isHovered ? 'bg-zinc-800/40' : ''} print:border-gray-300`}
                 >
                   {sIndex === 0 && (
-                    <td className="p-3 align-middle text-center border-r border-zinc-800/30" rowSpan={parsedMalzemeler.length}>
+                    <td className="p-4 align-middle text-center border-r border-zinc-800/30" rowSpan={parsedMalzemeler.length}>
                       <div className="flex flex-col items-center justify-center">
-                        <div className="font-bold text-zinc-200 text-sm mb-1">{item.imalat_adi}</div>
-                        <div className="text-[10px] font-mono text-zinc-500 bg-zinc-950 border border-zinc-800 inline-block px-1.5 py-0.5 rounded">{displayDate}</div>
+                        <div className="font-bold text-zinc-200 text-sm mb-1.5">{item.imalat_adi}</div>
+                        <div className="text-[10px] font-mono text-zinc-500 bg-zinc-950 border border-zinc-800 inline-block px-2 py-0.5 rounded-md">{displayDate}</div>
                       </div>
                     </td>
                   )}
                   
-                  <td className="p-3 align-middle text-center text-zinc-300 font-medium border-r border-zinc-800/30">
-                    {malz.ad || <span className="text-zinc-600 italic">Belirtilmedi</span>}
+                  <td className="p-4 align-middle text-center text-zinc-300 border-r border-zinc-800/30">
+                    <div className="font-medium">{malz.ad || <span className="text-zinc-600 italic">Belirtilmedi</span>}</div>
+                    {malz.spesifikasyon && <div className="text-[10px] font-mono text-zinc-500 mt-1">{malz.spesifikasyon}</div>}
                   </td>
                   
-                  <td className="p-3 align-middle text-center text-zinc-300 font-mono font-bold border-r border-zinc-800/30">
-                    {/* YENİ: Miktar varsa onu yazdır, yoksa eski metrajı yazdır (geri uyumluluk) */}
+                  <td className="p-4 align-middle text-center text-blue-400 font-mono text-sm font-bold border-r border-zinc-800/30">
                     {malz.miktar ? `${malz.miktar} ${malz.birim}` : (malz.metraj || '-')}
                   </td>
                   
                   {sIndex === 0 && (
                     <>
-                      <td className="p-3 align-middle text-center text-zinc-300 border-r border-zinc-800/30" rowSpan={parsedMalzemeler.length}>
-                        {item.imalat_yeri ? <span className="inline-block px-2.5 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[11px] font-bold">{item.imalat_yeri}</span> : '-'}
+                      <td className="p-4 align-middle text-center text-zinc-300 border-r border-zinc-800/30" rowSpan={parsedMalzemeler.length}>
+                        {item.imalat_yeri ? <span className="inline-block px-3 py-1 bg-zinc-900 border border-zinc-800 rounded-md text-[11px] font-bold tracking-wide">{item.imalat_yeri}</span> : '-'}
                       </td>
-                      <td className="p-3 align-middle text-center border-r border-zinc-800/30" rowSpan={parsedMalzemeler.length}>
-                        {item.calisan_sayisi > 0 ? <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-zinc-900 text-blue-400 font-bold text-xs border border-zinc-800">{item.calisan_sayisi}</span> : '-'}
+                      <td className="p-4 align-middle text-center border-r border-zinc-800/30" rowSpan={parsedMalzemeler.length}>
+                        {item.calisan_sayisi > 0 ? <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-zinc-900 text-blue-400 font-bold border border-zinc-700">{item.calisan_sayisi}</span> : '-'}
                       </td>
-                      <td className="p-3 align-middle text-center border-r border-zinc-800/30 print:hidden" rowSpan={parsedMalzemeler.length}>
+                      <td className="p-4 align-middle text-center border-r border-zinc-800/30 print:hidden" rowSpan={parsedMalzemeler.length}>
                         {parsedPhotos.length > 0 ? (
                           <div className="flex items-center justify-center gap-1.5">
                             <div className={`flex justify-center gap-1.5 ${isExpanded ? 'flex-wrap' : 'flex-nowrap'}`}>
                               {visiblePhotos.map((p, idx) => (
-                                <div key={idx} onClick={() => openLightbox(parsedPhotos, idx)} className="w-8 h-8 rounded overflow-hidden border border-zinc-700 cursor-pointer hover:border-blue-500 transition-all shrink-0 bg-zinc-950">
+                                <div key={idx} onClick={() => openLightbox(parsedPhotos, idx)} className="w-8 h-8 rounded border border-zinc-700 overflow-hidden cursor-pointer hover:border-blue-500 transition-all shrink-0 bg-zinc-950">
                                   <img src={p} alt={`foto-${idx}`} className="w-full h-full object-cover hover:scale-110 transition-transform" />
                                 </div>
                               ))}
                             </div>
                             {parsedPhotos.length > 3 && (
-                              <button onClick={() => setExpandedRowId(isExpanded ? null : item.id)} className="p-1 text-zinc-500 hover:text-white bg-zinc-900 border border-zinc-800 rounded shrink-0 cursor-pointer text-[10px] font-bold">
+                              <button onClick={() => setExpandedRowId(isExpanded ? null : item.id)} className="p-1.5 text-zinc-400 hover:text-white bg-zinc-900 border border-zinc-700 rounded-md shrink-0 cursor-pointer text-[10px] font-bold transition-colors">
                                 {isExpanded ? "▲" : `+${parsedPhotos.length - 3}`}
                               </button>
                             )}
                           </div>
                         ) : <span className="text-zinc-600 text-[10px] font-medium italic">Fotoğraf Yok</span>}
                       </td>
-                      <td className="p-3 align-middle text-center print:hidden" rowSpan={parsedMalzemeler.length}>
+                      <td className="p-4 align-middle text-center print:hidden" rowSpan={parsedMalzemeler.length}>
                         <div className="flex flex-row justify-center items-center gap-2">
                           <button onClick={() => openEditMode(item)} className="text-zinc-400 hover:text-blue-400 bg-zinc-900 hover:bg-blue-500/10 px-2.5 py-1.5 rounded transition-colors" title="Düzenle">✏️</button>
-                          <button onClick={() => handleDelete(item.id)} disabled={loading} className="text-zinc-400 hover:text-red-400 bg-zinc-900 hover:bg-red-500/10 px-2.5 py-1.5 rounded transition-colors" title="Sil">🗑️</button>
+                          <form action={silImalat}>
+                            <input type="hidden" name="id" value={item.id} />
+                            <button type="submit" onClick={(e) => { if(!confirm('Emin misiniz?')) e.preventDefault() }} className="text-zinc-400 hover:text-red-400 bg-zinc-900 hover:bg-red-500/10 px-2.5 py-1.5 rounded transition-colors" title="Sil">🗑️</button>
+                          </form>
                         </div>
                       </td>
                     </>
@@ -446,9 +468,9 @@ export default function ImalatClient({ imalatlar, kayitliMalzemeler = [] }: { im
       </div>
 
       {!isAdding && !editingId && (
-        <div className="mt-6 flex justify-center print:hidden">
-          <button onClick={openAddMode} className="flex items-center gap-2 px-6 py-2.5 bg-[#18181b] hover:bg-zinc-800 border border-zinc-700 hover:border-blue-500/40 text-zinc-300 hover:text-blue-400 text-sm font-bold rounded-full transition-all shadow-xl">
-            ➕ Yeni Saha İmalatı Ekle
+        <div className="mt-8 flex justify-center print:hidden">
+          <button onClick={openAddMode} className="flex items-center gap-2 px-8 py-3 bg-[#131316] hover:bg-[#18181b] border border-zinc-800 hover:border-blue-500/50 text-zinc-400 hover:text-blue-400 text-xs font-bold tracking-widest uppercase rounded-2xl transition-all shadow-lg hover:shadow-[0_0_20px_rgba(37,99,235,0.15)]">
+            ➕ YENİ SAHA İMALATI GİR
           </button>
         </div>
       )}

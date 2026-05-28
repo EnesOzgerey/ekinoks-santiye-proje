@@ -17,7 +17,6 @@ async function saveKatalogDosyasi(katalogDosya: File | null): Promise<string | n
     fs.mkdirSync(uploadDir, { recursive: true });
   }
   
-  // Dosya adındaki boşlukları temizleyip benzersiz bir ID ekliyoruz
   const safeName = katalogDosya.name.replace(/\s+/g, '_');
   const filename = `${Date.now()}_--${safeName}`;
   const filePath = path.join(uploadDir, filename);
@@ -28,11 +27,13 @@ async function saveKatalogDosyasi(katalogDosya: File | null): Promise<string | n
 
 export async function yeniMalzemeEkle(formData: FormData) {
   const cinsName = (formData.get("cinsName") as string).trim();
+  const kutuphaneAd = (formData.get("kutuphaneAd") as string)?.trim() || null;
   const markaName = (formData.get("markaName") as string).trim();
-  const durum = (formData.get("durum") as string) || "SUNULDU";
+  
+  const durum = (formData.get("durum") as string) || "SUNULMADI"; 
   
   const katalogDosya = formData.get("katalogDosya") as File | null;
-  const katalogPath = await saveKatalogDosyasi(katalogDosya); // Dosyayı kaydet ve yolunu al
+  const katalogPath = await saveKatalogDosyasi(katalogDosya); 
   
   const standartlarJSON = formData.get("standartlarJSON") as string;
   const standartlar = JSON.parse(standartlarJSON);
@@ -41,8 +42,11 @@ export async function yeniMalzemeEkle(formData: FormData) {
 
   const cins = await prisma.malzemeCinsi.upsert({
     where: { name: cinsName },
-    update: {},
-    create: { name: cinsName },
+    update: kutuphaneAd ? { kutuphane_ad: kutuphaneAd } : {},
+    create: { 
+      name: cinsName,
+      kutuphane_ad: kutuphaneAd
+    },
   });
 
   const marka = await prisma.marka.create({
@@ -50,7 +54,7 @@ export async function yeniMalzemeEkle(formData: FormData) {
       cins_id: cins.id,
       name: markaName,
       durum: durum,
-      katalog_url: katalogPath, // DB'ye artık fiziksel yolu yazıyoruz
+      katalog_url: katalogPath,
     }
   });
 
@@ -76,10 +80,11 @@ export async function yeniMalzemeEkle(formData: FormData) {
 export async function guncelleMarka(formData: FormData) {
   const markaId = parseInt(formData.get("markaId") as string, 10);
   const markaName = (formData.get("markaName") as string).trim();
-  const durum = (formData.get("durum") as string) || "SUNULDU";
+  
+  const durum = (formData.get("durum") as string) || "SUNULMADI";
   
   const katalogDosya = formData.get("katalogDosya") as File | null;
-  const katalogPath = await saveKatalogDosyasi(katalogDosya); // Yeni dosya yüklendiyse kaydet
+  const katalogPath = await saveKatalogDosyasi(katalogDosya); 
   
   const standartlarJSON = formData.get("standartlarJSON") as string;
   const standartlar = JSON.parse(standartlarJSON);
@@ -87,7 +92,6 @@ export async function guncelleMarka(formData: FormData) {
   if (!markaId || !markaName) throw new Error("Eksik veri.");
 
   const updateData: any = { name: markaName, durum: durum };
-  // Sadece yeni dosya yüklendiyse katalog_url'yi güncelle, yoksa eskisini koru
   if (katalogPath) updateData.katalog_url = katalogPath;
 
   await prisma.marka.update({ where: { id: markaId }, data: updateData });
@@ -112,17 +116,20 @@ export async function guncelleMarka(formData: FormData) {
   revalidatePath("/malzeme-tipleri");
 }
 
-export async function guncelleMalzemeCinsi(id: number, newName: string) {
+// YENİ: Edit modundan gelen Kütüphane Adını da (varsa) kaydediyoruz
+export async function guncelleMalzemeCinsi(id: number, newName: string, kutuphaneAd: string | null = null) {
   if (!newName.trim()) throw new Error("Kategori adı boş olamaz.");
   await prisma.malzemeCinsi.update({
     where: { id },
-    data: { name: newName.trim() }
+    data: { 
+      name: newName.trim(),
+      kutuphane_ad: kutuphaneAd
+    }
   });
   revalidatePath("/malzeme-tipleri");
 }
 
 export async function silMarka(formData: FormData) {
-  // Gelen form verisinden 'id' değerini alıp sayıya (integer) çeviriyoruz
   const idStr = formData.get("id") as string;
   if (!idStr) return;
   
@@ -132,8 +139,6 @@ export async function silMarka(formData: FormData) {
   
   if (marka) {
     await prisma.marka.delete({ where: { id } });
-    
-    // Eğer markayı sildikten sonra bağlı olduğu kategori (cins) boş kalırsa onu da temizle
     const kalanMarkalar = await prisma.marka.count({ where: { cins_id: marka.cins_id } });
     if (kalanMarkalar === 0) {
       await prisma.malzemeCinsi.delete({ where: { id: marka.cins_id } });
@@ -141,6 +146,7 @@ export async function silMarka(formData: FormData) {
   }
   revalidatePath("/malzeme-tipleri");
 }
+
 export async function silStandart(id: number) {
   await prisma.standart.delete({ where: { id } });
   revalidatePath("/malzeme-tipleri");
