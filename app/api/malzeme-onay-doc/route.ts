@@ -22,23 +22,28 @@ export async function POST(request: Request) {
     await workbook.xlsx.readFile(templatePath);
     const worksheet = workbook.worksheets[0]; 
 
-    // 1. KUSURSUZ HİBRİT GRUPLAMA ALGORİTMASI 
-    // (Hem eski düz JSON'u hem de yeni Prisma iç içe hiyerarşisini anlar)
+    // 1. GRUPLAMA ALGORİTMASI
     const groupedData: any[] = [];
     let totalDataRows = 0;
 
     materials.forEach((item: any) => {
-      // DURUM A: Yeni Prisma Hiyerarşik Yapısı (cins -> markalar -> standartlar)
       if (item.markalar && Array.isArray(item.markalar)) {
         let cName = (item.name || '-').trim();
         cName = cName.replace(/-/g, '\u2011').replace(/ \(/g, '\u00A0('); 
-        let cinsGroup = { cins: cName, companies: [] as any[], totalRows: 0 };
-        groupedData.push(cinsGroup);
+        
+        let cinsGroup = groupedData.find((g: any) => g.cins === cName);
+        if (!cinsGroup) {
+          cinsGroup = { cins: cName, companies: [], totalRows: 0 };
+          groupedData.push(cinsGroup);
+        }
 
         item.markalar.forEach((marka: any) => {
            let mName = (marka.name || '-').trim();
-           let companyGroup = { marka: mName, certs: [] as any[] };
-           cinsGroup.companies.push(companyGroup);
+           let companyGroup = cinsGroup.companies.find((c: any) => c.marka === mName);
+           if (!companyGroup) {
+             companyGroup = { marka: mName, certs: [] };
+             cinsGroup.companies.push(companyGroup);
+           }
 
            let certs = marka.standartlar || [];
            if (certs.length === 0) certs = [{}];
@@ -53,9 +58,7 @@ export async function POST(request: Request) {
              totalDataRows += 1; 
            });
         });
-      } 
-      // DURUM B: Eski Düz (Flat) JSON Yapısı
-      else {
+      } else {
         let cName = (item.cins_name || '-').trim();
         cName = cName.replace(/-/g, '\u2011').replace(/ \(/g, '\u00A0('); 
         const mName = (item.company_name || '-').trim();
@@ -88,34 +91,55 @@ export async function POST(request: Request) {
       }
     });
 
-    // 2. SATIR ENJEKSİYONU (15'ten İtibaren)
-    if (totalDataRows > 0) {
-      worksheet.spliceRows(15, 0, ...Array(totalDataRows).fill([]));
+    // 2. ŞABLON KORUMA (Yükseklikler ve Birleştirmeler)
+    const originalHeights: Record<number, number> = {};
+    for (let i = 1; i <= 100; i++) {
+        originalHeights[i] = worksheet.getRow(i).height;
     }
 
-    // 3. GELİŞTİRİLMİŞ SİHİRLİ SİLİCİ (Sorunu çözen yer burası)
-    // Şablon aşağı itilirken uzayan ve yeni verilerimizle çarpışan tüm "Hayalet Birleştirmeleri" yok eder.
+    const originalMerges: any[] = [];
     if ((worksheet as any)._merges) {
-      const cleanMerges: any = {};
-      for (const key in (worksheet as any)._merges) {
-        const m = (worksheet as any)._merges[key];
-        
-        // 15'ten önceki üst başlık (Header) birleştirmeleri KORUNUR
-        const isHeader = m.bottom < 15;
-        
-        // Orijinalde 17'den başlayan alt kısım (Footer) birleştirmeleri KORUNUR
-        // (totalDataRows kadar aşağı itildikleri için yeni konumları 17 + totalDataRows oldu)
-        const isFooter = m.top >= 17 + totalDataRows;
-
-        // Header veya Footer değilse, bu bir hayalet veridir; SİL!
-        if (isHeader || isFooter) {
-          cleanMerges[key] = m;
+        for (const key in (worksheet as any)._merges) {
+            originalMerges.push((worksheet as any)._merges[key].model);
         }
-      }
-      (worksheet as any)._merges = cleanMerges;
+        (worksheet as any)._merges = {}; 
     }
 
-    // 4. VERİ YAZMA VE DİNAMİK HÜCRE BOYAMA
+    // 3. SATIR EKLEME
+    const offset = totalDataRows > 1 ? totalDataRows - 1 : 0;
+    
+    worksheet.spliceRows(16, 1); 
+    const rowsToInsert = offset + 1; 
+    worksheet.spliceRows(16, 0, ...Array(rowsToInsert).fill([]));
+    
+    const templateRow = worksheet.getRow(15);
+    for (let i = 1; i <= offset; i++) {
+        const newRow = worksheet.getRow(15 + i);
+        templateRow.eachCell({ includeEmpty: true }, (cell, colNumber) => {
+            newRow.getCell(colNumber).style = cell.style;
+        });
+    }
+
+    // 4. ŞABLON YÜKSEKLİKLERİNİ RESTORE ET
+    for (let r = 15; r <= 15 + offset; r++) {
+        worksheet.getRow(r).height = originalHeights[15] || 35;
+    }
+    worksheet.getRow(16 + offset).height = originalHeights[16] || 15; 
+    
+    for (let i = 17; i <= 100; i++) {
+        worksheet.getRow(i + offset).height = originalHeights[i];
+    }
+
+    // 5. BİRLEŞTİRMELERİ RESTORE ET
+    originalMerges.forEach(m => {
+        if (m.top < 15) {
+            worksheet.mergeCells(m.top, m.left, m.bottom, m.right);
+        } else if (m.top >= 17) {
+            worksheet.mergeCells(m.top + offset, m.left, m.bottom + offset, m.right);
+        }
+    });
+
+    // 6. VERİ YAZMA VE DİNAMİK HÜCRE BOYAMA (Tablo İçi)
     let currentRow = 15; 
     let siraNo = 1;
     const mergesToExecute: string[] = []; 
@@ -131,7 +155,6 @@ export async function POST(request: Request) {
 
         compGroup.certs.forEach((cert: any) => {
           const row = worksheet.getRow(currentRow);
-          row.height = 35; 
 
           row.getCell('C').value = currentRow === cinsStartRow ? siraNo : null;
           row.getCell('D').value = currentRow === cinsStartRow ? cinsGroup.cins : null;
@@ -182,12 +205,10 @@ export async function POST(request: Request) {
       siraNo++; 
     });
 
-    // 5. BİRLEŞTİRMELERİ ATEŞLE
     mergesToExecute.forEach(range => {
-      try { worksheet.mergeCells(range); } catch (e) { console.warn(`Merge engeli: ${range}`); }
+      try { worksheet.mergeCells(range); } catch (e) { }
     });
 
-    // 6. MASTER HÜCRELERİ MÜHÜRLE
     masterCellsToFix.forEach(info => {
       const cell = worksheet.getCell(info.address);
       cell.border = {
@@ -198,37 +219,102 @@ export async function POST(request: Request) {
       };
     });
 
-    // 7. FORMÜL KORUMASI
-    workbook.calcProperties.fullCalcOnLoad = true;
+    // 7. TABLO DIŞ KENARLIKLARI 
+    const lastDataRow = 15 + offset;
     worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber >= 15 + totalDataRows) {
-        row.eachCell((cell) => {
-          if (cell.value && typeof cell.value === 'object' && 'formula' in cell.value) {
-            const formulaValue = cell.value as any;
-            cell.value = {
-              formula: formulaValue.formula,
-              sharedFormula: formulaValue.sharedFormula
-            };
-          }
-        });
+      if (rowNumber >= 15 && rowNumber <= lastDataRow) {
+        const cellC = row.getCell('C');
+        cellC.border = { ...(cellC.border || {}), left: { style: 'medium', color: { argb: 'FF000000' } } };
+
+        const cellH = row.getCell('H');
+        cellH.border = { ...(cellH.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
       }
     });
 
-    // 8. 📅 OTOMATİK TARİH GÜNCELLEMESİ VE '0' HATASI ÇÖZÜMÜ
+    const bottomRow = worksheet.getRow(lastDataRow);
+    ['C', 'D', 'E', 'F', 'G', 'H'].forEach(col => {
+       const cell = bottomRow.getCell(col);
+       cell.border = { ...(cell.border || {}), bottom: { style: 'medium', color: { argb: 'FF000000' } } };
+    });
+
+    // --- NOKTA ATIŞI KENARLIK MOTORU ---
+    const updateBorder = (rowNum: number, col: string, borderUpdates: any) => {
+      const cell = worksheet.getRow(rowNum).getCell(col);
+      const currentBorder = cell.border || {};
+      const newBorder: any = { ...currentBorder };
+      for (const edge in borderUpdates) {
+        if (borderUpdates[edge] === null) {
+          delete newBorder[edge];
+        } else {
+          newBorder[edge] = borderUpdates[edge];
+        }
+      }
+      cell.border = newBorder;
+    };
+
+    const thickBorder = { style: 'medium', color: { argb: 'FF000000' } };
+    const thinBorder = { style: 'thin', color: { argb: 'FF000000' } };
+
+    // --- ÜST KISIM (HEADER) KENARLIKLARI ---
+    // 4, 5, 6, 8 ve 13. satırlarda C sütunu sağ kalın kenarlık
+    [4, 5, 6, 8, 13].forEach(rowNum => {
+      updateBorder(rowNum, 'C', { right: thickBorder });
+      updateBorder(rowNum, 'D', { left: thickBorder }); // Mühürleme
+    });
+
+    // 9, 10, 11 ve 12. satırlarda E sütunu sağ kalın kenarlık
+    [9, 10, 11, 12].forEach(rowNum => {
+      updateBorder(rowNum, 'E', { right: thickBorder });
+      updateBorder(rowNum, 'F', { left: thickBorder }); // Mühürleme
+    });
+
+
+    // --- ALT KISIM (FOOTER) KENARLIKLARI ---
+    // 1. satır (16 + offset) - Tampon boşluk satırı (H sütunundaki sağ kenarlık iptal edildi)
+    updateBorder(16 + offset, 'C', { left: null });
+    updateBorder(16 + offset, 'F', { right: null });
+    updateBorder(16 + offset, 'H', { right: null });
+
+    // 2. satır (17 + offset)
+    updateBorder(17 + offset, 'F', { right: thickBorder });
+
+    // 3. satır (18 + offset)
+    updateBorder(18 + offset, 'C', { right: thinBorder });
+    updateBorder(18 + offset, 'D', { right: thinBorder });
+    updateBorder(18 + offset, 'E', { right: thinBorder });
+
+    // 4. satır (19 + offset)
+    updateBorder(19 + offset, 'F', { right: thickBorder });
+
+    // 5. satır (20 + offset)
+    updateBorder(20 + offset, 'F', { right: thickBorder });
+
+    // 7. satır (22 + offset)
+    updateBorder(22 + offset, 'C', { right: thickBorder });
+    updateBorder(22 + offset, 'E', { right: thickBorder }); 
+
+    // 8. satır (23 + offset)
+    updateBorder(23 + offset, 'F', { right: thickBorder });
+
+    // 9. satır (24 + offset)
+    updateBorder(24 + offset, 'F', { right: thickBorder });
+
+    // 11. satır (26 + offset)
+    updateBorder(26 + offset, 'F', { right: thickBorder });
+
+    // 8. 📅 OTOMATİK TARİH GÜNCELLEMESİ
+    workbook.calcProperties.fullCalcOnLoad = true;
     const today = new Date();
     const dd = String(today.getDate()).padStart(2, '0');
     const mm = String(today.getMonth() + 1).padStart(2, '0');
     const yyyy = today.getFullYear();
     const formattedDateString = `___${dd}__ / __${mm}__ / ${yyyy}`;
-
     const dateRegex = /___\d{2}__\s*\/\s*__\d{2}__\s*\/\s*\d{4}/g;
 
     worksheet.eachRow((row) => {
       row.eachCell((cell) => {
         if (typeof cell.value === 'string') {
-          if (dateRegex.test(cell.value)) {
-            cell.value = cell.value.replace(dateRegex, formattedDateString);
-          }
+          if (dateRegex.test(cell.value)) cell.value = cell.value.replace(dateRegex, formattedDateString);
         } 
         else if (cell.value && typeof cell.value === 'object' && 'richText' in cell.value) {
           let hasChange = false;
@@ -239,178 +325,21 @@ export async function POST(request: Request) {
             }
             return rt;
           });
-          if (hasChange) {
-            cell.value = { richText: newRichText };
-          }
-        }
+          if (hasChange) cell.value = { richText: newRichText };
+        } 
         else if (cell.value && typeof cell.value === 'object' && ('formula' in cell.value || 'sharedFormula' in cell.value)) {
           const formulaStr = String((cell.value as any).formula || '').toUpperCase();
           const resultValue = (cell.value as any).result;
 
           if (/^[A-Z]{1,2}\d{1,3}$/.test(formulaStr) || formulaStr.includes('19') || resultValue === 0) {
             cell.value = formattedDateString;
+          } else {
+            const formulaValue = cell.value as any;
+            cell.value = { formula: formulaValue.formula, sharedFormula: formulaValue.sharedFormula };
           }
         }
       });
     });
-
-    // 9. 🎨 ALT ŞABLON KENARLIK RESTORASYONU
-    const offset = totalDataRows;
-    
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber >= 15 && rowNumber < 15 + offset) {
-        const cellC = row.getCell('C');
-        cellC.border = { ...(cellC.border || {}), left: { style: 'medium', color: { argb: 'FF000000' } } };
-
-        const cellH = row.getCell('H');
-        cellH.border = { ...(cellH.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
-      }
-    });
-
-    const maxRowLimit = 50 + offset; 
-    
-    for (let r = 15 + offset; r <= maxRowLimit; r++) {
-      const row = worksheet.getRow(r);
-      const originalRow = r - offset; 
-
-      ['I', 'J', 'K', 'L', 'M'].forEach(col => {
-        row.getCell(col).border = {};
-      });
-
-      if (originalRow > 26) {
-        ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].forEach(col => {
-          row.getCell(col).border = {};
-        });
-        continue; 
-      }
-      
-      const bCell = row.getCell('B');
-      const cCell = row.getCell('C');
-      const dCell = row.getCell('D');
-      const eCell = row.getCell('E');
-      const fCell = row.getCell('F');
-      const gCell = row.getCell('G');
-      const hCell = row.getCell('H');
-
-      if (originalRow === 15 || originalRow === 16) {
-        ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].forEach(col => {
-          row.getCell(col).border = {};
-        });
-        continue; 
-      }
-
-      if (originalRow >= 17 && originalRow <= 24) {
-        
-        cCell.border = { ...(cCell.border || {}), left: { style: 'medium', color: { argb: 'FF000000' } } };
-        hCell.border = { ...(hCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
-        eCell.border = { ...(eCell.border || {}), right: { style: 'thin', color: { argb: 'FF000000' } } };
-        
-        if (![17, 18, 19, 20].includes(originalRow)) {
-          fCell.border = { ...(fCell.border || {}), left: { style: 'thin', color: { argb: 'FF000000' } } };
-        }
-
-        if (gCell.border) { 
-          const gClean = { ...gCell.border }; 
-          delete (gClean as any).left; 
-          delete (gClean as any).right; 
-          gCell.border = gClean; 
-        }
-
-        if (originalRow === 17) {
-          fCell.border = {
-            right: { style: 'medium', color: { argb: 'FF000000' } },
-            top: { style: 'medium', color: { argb: 'FF000000' } },
-            left: { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } }
-          };
-        }
-
-        if (originalRow === 18) {
-          fCell.border = {
-            top: { style: 'thin', color: { argb: 'FF000000' } },
-            left: { style: 'thin', color: { argb: 'FF000000' } }
-          };
-          gCell.border = {
-            top: { style: 'thin', color: { argb: 'FF000000' } }
-          };
-        }
-
-        if (originalRow === 19) {
-          fCell.border = {
-            left: { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } },
-            right: { style: 'medium', color: { argb: 'FF000000' } }
-          };
-        }
-
-        if (originalRow === 20) {
-          fCell.border = {
-            right: { style: 'medium', color: { argb: 'FF000000' } },
-            left: { style: 'thin', color: { argb: 'FF000000' } },
-            top: { style: 'thin', color: { argb: 'FF000000' } },
-            bottom: { style: 'thin', color: { argb: 'FF000000' } }
-          };
-        }
-
-        if (originalRow === 21) {
-          cCell.border = { 
-            ...(cCell.border || {}), 
-            left: { style: 'medium', color: { argb: 'FF000000' } }
-          };
-          delete (cCell.border as any).right;
-          
-          if (dCell.border) {
-             delete (dCell.border as any).left;
-          }
-
-          dCell.border = {
-            ...(dCell.border || {}),
-            bottom: { style: 'thin', color: { argb: 'FF000000' } }
-          };
-
-          fCell.border = { 
-            ...(fCell.border || {}), 
-            right: { style: 'medium', color: { argb: 'FF000000' } } 
-          };
-        }
-
-        if (originalRow === 22) {
-          cCell.border = {
-            right: { style: 'medium', color: { argb: 'FF000000' } },
-            left: { style: 'medium', color: { argb: 'FF000000' } },
-            bottom: { style: 'medium', color: { argb: 'FF000000' } },
-            top: { style: 'thin', color: { argb: 'FF000000' } }
-          };
-        }
-
-        if (originalRow >= 22 && originalRow <= 24) {
-          fCell.border = { ...(fCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
-        }
-      }
-
-      if (originalRow === 25) {
-        const prevC = worksheet.getRow(r - 1).getCell('C');
-        if (prevC.border) {
-          const prevBorder = { ...prevC.border };
-          delete (prevBorder as any).bottom;
-          prevC.border = prevBorder;
-        }
-
-        bCell.border = { ...(bCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
-
-        cCell.border = { left: { style: 'medium', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
-        dCell.border = { left: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
-        eCell.border = { left: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'thin', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
-        fCell.border = { left: { style: 'thin', color: { argb: 'FF000000' } }, right: { style: 'medium', color: { argb: 'FF000000' } }, bottom: { style: 'thin', color: { argb: 'FF000000' } } };
-        hCell.border = { ...(hCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
-      }
-
-      if (originalRow === 26) {
-        fCell.border = { right: { style: 'medium', color: { argb: 'FF000000' } }, bottom: { style: 'medium', color: { argb: 'FF000000' } }, left: { style: 'thin', color: { argb: 'FF000000' } }, top: { style: 'thin', color: { argb: 'FF000000' } } };
-        cCell.border = { ...(cCell.border || {}), left: { style: 'medium', color: { argb: 'FF000000' } } };
-        hCell.border = { ...(hCell.border || {}), right: { style: 'medium', color: { argb: 'FF000000' } } };
-      }
-    }
 
     const buffer = await workbook.xlsx.writeBuffer();
 

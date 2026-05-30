@@ -11,7 +11,7 @@ export const BoundaryBuilder = ({ elevation }) => {
   const points = currentFloor?.boundaryPoints || [];
   const isClosed = currentFloor?.isBoundaryClosed;
 
-  const [mousePos, setMousePos]] = useState([0, 0, 0]);
+  const [mousePos, setMousePos] = useState([0, 0, 0]);
   const planeRef = useRef(new THREE.Plane(new THREE.Vector3(0, 1, 0), -elevation));
 
   // Farenin anlık pozisyonunu hesaplamak için useFrame hook'u kullanıyoruz
